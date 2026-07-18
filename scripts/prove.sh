@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+#
+# Generates a Groth16 delivery proof and prints it in the shape `cast send`
+# wants for EscrowUpgradeable.release().
+#
+# Usage:
+#   ./scripts/prove.sh <secret> <escrowId> [outDir]
+#
+#   secret    — the delivery secret, as a decimal field element
+#   escrowId  — the escrow this proof may be spent against
+#   outDir    — where to write proof.json / public.json / calldata
+#               (default: circuits/build/proofs/<escrowId>)
+#
+# The commitment and nullifier are DERIVED here, not supplied: the circuit
+# constrains commitment == Poseidon(secret) and nullifier == Poseidon(secret,
+# escrowId), so any other value simply fails to witness. The commitment printed
+# below is the one to pass to createEscrow().
+#
+# Requires ./scripts/build-circuit.sh to have been run first.
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+CIRCUIT_NAME="delivery"
+BUILD_DIR="circuits/build"
+ZKEY="$BUILD_DIR/${CIRCUIT_NAME}_final.zkey"
+WASM="$BUILD_DIR/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm"
+VKEY="$BUILD_DIR/verification_key.json"
+
+SNARKJS="npx --no-install snarkjs"
+
+log() { printf '\033[1;34m==>\033[0m %s\n' "$*" >&2; }
+die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+
+[ $# -ge 2 ] || die "usage: $0 <secret> <escrowId> [outDir]"
+
+SECRET="$1"
+ESCROW_ID="$2"
+OUT_DIR="${3:-$BUILD_DIR/proofs/$ESCROW_ID}"
+
+[ -f "$ZKEY" ] || die "proving key missing at $ZKEY. Run: ./scripts/build-circuit.sh"
+[ -f "$WASM" ] || die "witness calculator missing at $WASM. Run: ./scripts/build-circuit.sh"
+[ -d "node_modules/circomlibjs" ] || die "circomlibjs missing. Run: npm install"
+
+mkdir -p "$OUT_DIR"
+
+log "Deriving commitment and nullifier"
+HASHES="$(node scripts/poseidon.js "$SECRET" "$ESCROW_ID")"
+COMMITMENT="$(echo "$HASHES" | sed -n 's/.*"commitment": "\([0-9]*\)".*/\1/p')"
+NULLIFIER="$(echo "$HASHES" | sed -n 's/.*"nullifier": "\([0-9]*\)".*/\1/p')"
+
+[ -n "$COMMITMENT" ] || die "failed to derive commitment"
+[ -n "$NULLIFIER" ] || die "failed to derive nullifier"
+
+cat > "$OUT_DIR/input.json" <<EOF
+{
+  "secret": "$SECRET",
+  "commitment": "$COMMITMENT",
+  "escrowId": "$ESCROW_ID"
+}
+EOF
+
+log "Computing witness"
+$SNARKJS wtns calculate "$WASM" "$OUT_DIR/input.json" "$OUT_DIR/witness.wtns"
+
+log "Generating Groth16 proof"
+$SNARKJS groth16 prove "$ZKEY" "$OUT_DIR/witness.wtns" \
+    "$OUT_DIR/proof.json" "$OUT_DIR/public.json"
+
+log "Verifying proof locally before printing calldata"
+$SNARKJS groth16 verify "$VKEY" "$OUT_DIR/public.json" "$OUT_DIR/proof.json"
+
+log "Exporting Solidity calldata"
+$SNARKJS zkey export soliditycalldata "$OUT_DIR/public.json" "$OUT_DIR/proof.json" \
+    > "$OUT_DIR/calldata.txt"
+
+# snarkjs prints: [a], [[b]], [c], [pubSignals] — split into the four groups so
+# callers can drop them straight into `cast send`.
+CALLDATA="$(cat "$OUT_DIR/calldata.txt")"
+PA="$(echo "$CALLDATA" | sed -n 's/^\(\[[^]]*\]\),\[\[.*/\1/p')"
+PB="$(echo "$CALLDATA" | sed -n 's/^\[[^]]*\],\(\[\[[^]]*\],\[[^]]*\]\]\),\[.*/\1/p')"
+PC="$(echo "$CALLDATA" | sed -n 's/.*\]\],\(\[[^]]*\]\),\[[^]]*\]$/\1/p')"
+
+cat > "$OUT_DIR/release-args.json" <<EOF
+{
+  "escrowId": "$ESCROW_ID",
+  "commitment": "$COMMITMENT",
+  "nullifier": "$NULLIFIER",
+  "pA": $PA,
+  "pB": $PB,
+  "pC": $PC
+}
+EOF
+
+echo
+echo "commitment (pass to createEscrow): $COMMITMENT"
+echo "nullifier  (pass to release):      $NULLIFIER"
+echo
+echo "release() arguments:"
+echo "  escrowId  $ESCROW_ID"
+echo "  nullifier $NULLIFIER"
+echo "  pA        $PA"
+echo "  pB        $PB"
+echo "  pC        $PC"
+echo
+echo "artifacts: $OUT_DIR/{proof.json,public.json,calldata.txt,release-args.json}"

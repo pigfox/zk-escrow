@@ -12,6 +12,14 @@ remappings = [
     "forge-std/=lib/forge-std/src/",
 ]
 
+# Tests read the checked-in fixture proofs; nothing else touches the filesystem.
+fs_permissions = [{access = "read", path = "./test/fixtures"}]
+
+[lint]
+# Verifier.sol is generated verbatim by snarkjs. Its naming and layout are not
+# ours to change, and regenerating would just reintroduce any edits.
+ignore = ["src/Verifier.sol"]
+
 [profile.default.fuzz]
 runs = 512
 
