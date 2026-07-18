@@ -1,0 +1,64 @@
+# Lint configuration for the ZK escrow AI arbiter.
+#
+# The agent handles a private key and an API key, so the linter set leans
+# toward correctness and error handling rather than style bikeshedding.
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  enable:
+    - errcheck      # every returned error must be handled
+    - errorlint     # use errors.Is/As and %w rather than == and %v
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - gosimple
+    - gocritic
+    - revive        # exported symbols must be documented
+    - misspell
+    - unconvert
+    - unparam
+    - bodyclose     # HTTP response bodies must be closed
+    - noctx         # outbound requests must carry a context
+    - goconst       # repeated literals belong in internal/config
+    - nakedret
+    - prealloc
+    - copyloopvar
+    - durationcheck
+    - nilerr
+    - wastedassign
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+  revive:
+    rules:
+      - name: exported
+        severity: warning
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    # Test tables legitimately repeat short literals.
+    ignore-tests: true
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+    disabled-checks:
+      - hugeParam       # escrow.Dispute is passed by value deliberately
+      - rangeValCopy
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Table-driven tests routinely shadow and repeat; that is not a defect.
+    - path: _test\.go
+      linters:
+        - unparam
+        - goconst
