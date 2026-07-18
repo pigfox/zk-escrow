@@ -3,13 +3,11 @@ pragma solidity 0.8.28;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from
     "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {BaseTest} from "./Base.t.sol";
 import {EscrowUpgradeable} from "../src/EscrowUpgradeable.sol";
-import {MockVerifier} from "./mocks/MockVerifier.sol";
 import {MaliciousReceiver} from "./mocks/MaliciousReceiver.sol";
 
 /// @title EscrowUpgradeableTest
