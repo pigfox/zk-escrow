@@ -30,3 +30,31 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Foundry
+out/
+cache/
+broadcast/
+lcov.info
+coverage-report/
+
+# Circom / snarkjs artifacts. Only the .circom source, the build script, and the
+# generated src/Verifier.sol are checked in.
+*.zkey
+*.wtns
+*.ptau
+*.r1cs
+*.sym
+circuits/build/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Medusa fuzzing corpus
+medusa-corpus/
+crytic-export/
+
+# Claude Code local settings
+.claude/settings.local.json
