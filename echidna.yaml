@@ -1,0 +1,33 @@
+# Echidna configuration for the shared property harness.
+#
+# Run:  echidna test/Properties.sol --contract Properties --config echidna.yaml
+#
+# Properties.sol is deliberately the SAME contract Medusa and Foundry drive, so
+# a property can never hold in one engine and silently rot in another.
+
+# Assert against the boolean echidna_* predicates rather than Solidity asserts.
+testMode: property
+
+# Endow the harness at construction so it can stake the buyer actor.
+balanceContract: 1000000000000000000000
+
+# The harness routes every party through its own Actor contracts, so Echidna's
+# own sender set only needs to reach the harness itself.
+allContracts: false
+
+testLimit: 100000
+seqLen: 64
+shrinkLimit: 5000
+
+# Deterministic runs, so a CI failure is reproducible locally.
+seed: 20240718
+
+corpusDir: echidna-corpus
+
+# Fail loudly rather than reporting a pass when the harness cannot be deployed.
+stopOnFail: true
+
+# Reuse the artifacts `forge build` already produced. Without this,
+# crytic-compile tries to download its own solc, which needs network access
+# and a GitHub API budget CI should not depend on.
+cryticArgs: ["--foundry-ignore-compile"]

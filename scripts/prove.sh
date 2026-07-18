@@ -47,11 +47,15 @@ mkdir -p "$OUT_DIR"
 
 log "Deriving commitment and nullifier"
 HASHES="$(node scripts/poseidon.js "$SECRET" "$ESCROW_ID")"
-COMMITMENT="$(echo "$HASHES" | sed -n 's/.*"commitment": "\([0-9]*\)".*/\1/p')"
-NULLIFIER="$(echo "$HASHES" | sed -n 's/.*"nullifier": "\([0-9]*\)".*/\1/p')"
+COMMITMENT="$(echo "$HASHES" | sed -n 's/^ *"commitment": "\([0-9]*\)".*/\1/p')"
+NULLIFIER="$(echo "$HASHES" | sed -n 's/^ *"nullifier": "\([0-9]*\)".*/\1/p')"
+COMMITMENT_HEX="$(echo "$HASHES" | sed -n 's/^ *"commitmentHex": "\(0x[0-9a-f]*\)".*/\1/p')"
+NULLIFIER_HEX="$(echo "$HASHES" | sed -n 's/^ *"nullifierHex": "\(0x[0-9a-f]*\)".*/\1/p')"
 
 [ -n "$COMMITMENT" ] || die "failed to derive commitment"
 [ -n "$NULLIFIER" ] || die "failed to derive nullifier"
+[ -n "$COMMITMENT_HEX" ] || die "failed to derive commitment (hex)"
+[ -n "$NULLIFIER_HEX" ] || die "failed to derive nullifier (hex)"
 
 cat > "$OUT_DIR/input.json" <<EOF
 {
@@ -82,11 +86,17 @@ PA="$(echo "$CALLDATA" | sed -n 's/^\(\[[^]]*\]\),\[\[.*/\1/p')"
 PB="$(echo "$CALLDATA" | sed -n 's/^\[[^]]*\],\(\[\[[^]]*\],\[[^]]*\]\]\),\[.*/\1/p')"
 PC="$(echo "$CALLDATA" | sed -n 's/.*\]\],\(\[[^]]*\]\),\[[^]]*\]$/\1/p')"
 
+# All field elements are written as 0x-hex so Solidity fixtures can read them
+# with vm.parseBytes32; the decimal forms are kept alongside for humans and for
+# pasting into `cast`.
 cat > "$OUT_DIR/release-args.json" <<EOF
 {
-  "escrowId": "$ESCROW_ID",
-  "commitment": "$COMMITMENT",
-  "nullifier": "$NULLIFIER",
+  "escrowId": "$(printf '0x%064x' "$ESCROW_ID")",
+  "escrowIdDecimal": "$ESCROW_ID",
+  "commitment": "$COMMITMENT_HEX",
+  "commitmentDecimal": "$COMMITMENT",
+  "nullifier": "$NULLIFIER_HEX",
+  "nullifierDecimal": "$NULLIFIER",
   "pA": $PA,
   "pB": $PB,
   "pC": $PC

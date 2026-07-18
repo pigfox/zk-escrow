@@ -30,11 +30,18 @@ async function main() {
     const commitment = F.toObject(poseidon([s]));
     const nullifier = F.toObject(poseidon([s, id]));
 
+    // Emit both encodings: decimal for circom's input.json and for humans,
+    // 0x-padded hex for the Solidity fixtures (forge's JSON reader coerces
+    // long decimal strings and loses them, but reads hex cleanly).
+    const hex = (n) => "0x" + n.toString(16).padStart(64, "0");
+
     process.stdout.write(
         JSON.stringify(
             {
                 commitment: commitment.toString(),
                 nullifier: nullifier.toString(),
+                commitmentHex: hex(commitment),
+                nullifierHex: hex(nullifier),
             },
             null,
             2,

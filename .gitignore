@@ -13,7 +13,8 @@
 
 # Code coverage profiles and other test artifacts
 *.out
-coverage.*
+coverage.html
+coverage.txt
 *.coverprofile
 profile.cov
 
@@ -58,3 +59,6 @@ crytic-export/
 
 # Claude Code local settings
 .claude/settings.local.json
+echidna-corpus/
+slither_results.json
+coverage-summary.txt
