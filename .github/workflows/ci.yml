@@ -73,9 +73,12 @@ jobs:
         run: go vet ./...
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6.1.1
+        uses: golangci/golangci-lint-action@v9.3.0
         with:
-          version: v1.64.8
+          # v2 of golangci-lint is required: the v1.x binaries are built with
+          # Go 1.24 and refuse to lint a module targeting a newer Go than they
+          # were built with. agent/.golangci.yml is in the v2 schema to match.
+          version: v2.12.2
           working-directory: agent
 
       - name: Test with coverage
@@ -108,19 +111,36 @@ jobs:
         with:
           version: stable
 
+      - name: Install crytic-compile and slither
+        run: |
+          pipx install crytic-compile
+          pipx install slither-analyzer
+
+      # Echidna is installed as a plain binary rather than run via
+      # crytic/echidna-action, because that action runs echidna inside a
+      # container that has no `forge` on PATH — and crytic-compile shells out
+      # to `forge config --json` to read the project layout. Installing it here
+      # keeps echidna in the same environment as the toolchain it needs, and
+      # makes the CI invocation identical to the documented local one.
+      - name: Install echidna
+        run: |
+          set -euo pipefail
+          curl -sSL -o echidna.tar.gz \
+            https://github.com/crytic/echidna/releases/download/v2.2.6/echidna-2.2.6-x86_64-linux.tar.gz
+          tar xzf echidna.tar.gz
+          sudo install -m 0755 echidna /usr/local/bin/echidna
+          echidna --version
+
       # Echidna consumes the artifacts forge produces (--foundry-ignore-compile
       # in echidna.yaml), so crytic-compile never needs to fetch its own solc.
       - name: Build artifacts for crytic-compile
         run: forge build
 
-      - uses: crytic/echidna-action@v2.2.0
-        with:
-          files: .
-          contract: Properties
-          config: echidna.yaml
-          test-mode: property
-          # crytic-args stay in echidna.yaml (cryticArgs) so the local and CI
-          # invocations cannot drift apart.
+      - name: Fuzz
+        # Target the project directory, not the single file: crytic-compile
+        # treats a lone .sol path as a standalone solc target and tries to
+        # download a matching compiler.
+        run: echidna . --contract Properties --config echidna.yaml
 
   # ---------------------------------------------------------------------------
   medusa:

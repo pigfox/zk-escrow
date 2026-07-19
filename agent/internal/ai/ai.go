@@ -212,10 +212,13 @@ func ParseDecision(raw string) (escrow.Decision, error) {
 // BuildPrompt renders a dispute's evidence bundle into the user prompt.
 func BuildPrompt(dispute escrow.Dispute) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf(config.PromptHeaderFormat, dispute.EscrowID.String()))
+	// Fprintf to the builder rather than WriteString(Sprintf(...)): a
+	// strings.Builder never returns an error, so the discarded returns are safe
+	// and it avoids an intermediate allocation per segment.
+	fmt.Fprintf(&b, config.PromptHeaderFormat, dispute.EscrowID.String())
 	for i, submission := range dispute.Submissions {
-		b.WriteString(fmt.Sprintf(config.PromptEvidenceFormat,
-			i+1, submission.RaisedBy.Hex(), submission.Evidence))
+		fmt.Fprintf(&b, config.PromptEvidenceFormat,
+			i+1, submission.RaisedBy.Hex(), submission.Evidence)
 	}
 	b.WriteString(config.PromptFooter)
 	return b.String()
