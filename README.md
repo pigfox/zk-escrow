@@ -194,6 +194,12 @@ npm install                  # circomlib 2.0.5, circomlibjs 0.1.7, snarkjs 0.7.5
 into `circuits/build/` (gitignored). Only the `.circom` source, the scripts and
 the generated verifier are tracked.
 
+> Re-running `build-circuit.sh` performs a *fresh* setup, so the verification
+> key — and with it `src/Verifier.sol` — changes. The checked-in fixture proofs
+> were generated against the previous key and must be regenerated alongside it;
+> the script header gives the two commands. `forge test` fails loudly if you
+> forget, so this cannot slip through silently.
+
 The circuit is 932 R1CS constraints — one private input (`secret`), two public
 inputs (`commitment`, `escrowId`) and one public output (`nullifier`).
 
@@ -206,6 +212,19 @@ inputs (`commitment`, `escrowId`) and one public output (`nullifier`).
 > value. Production needs a multi-party ceremony — a Perpetual Powers of Tau
 > file plus independent phase-2 contributors — where no single participant sees
 > all the randomness.
+
+### npm advisories
+
+`package.json` carries `overrides` pinning `ws`, `underscore` and `elliptic`
+forward past their advisories, because the direct dependencies (`snarkjs`,
+`circomlibjs`) have no releases that do it themselves. That clears every high
+and moderate finding.
+
+What remains is 15 low-severity findings, all one root cause: `elliptic@6.6.1`
+is the newest published version and its advisory has no fix. It reaches the
+tree through `circomlibjs → ethers@5`, and nothing here signs with it — the
+only thing this project uses `circomlibjs` for is computing Poseidon hashes.
+It is not in the trust path for proofs or for any key.
 
 ### Why the nullifier is derived from the escrow id
 

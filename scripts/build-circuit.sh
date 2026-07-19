@@ -19,6 +19,18 @@
 # # Powers of Tau file plus independent phase-2 contributors) where no single #
 # # participant sees all the randomness.                                      #
 # ############################################################################
+#
+# NOTE: re-running this script performs a FRESH Groth16 setup, which produces a
+# different verification key and therefore a different src/Verifier.sol. The
+# checked-in fixture proofs under test/fixtures/ were generated against the
+# previous key and will no longer verify. After re-running, regenerate them:
+#
+#   ./scripts/prove.sh 12345 0 && cp circuits/build/proofs/0/release-args.json \
+#       test/fixtures/delivery-proof-escrow0.json
+#   ./scripts/prove.sh 12345 1 && cp circuits/build/proofs/1/release-args.json \
+#       test/fixtures/delivery-proof-escrow1.json
+#
+# `forge test` will fail loudly if you forget, so this cannot go unnoticed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
