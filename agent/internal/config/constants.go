@@ -31,6 +31,9 @@ const (
 	EnvRPCURL = "RPC_URL"
 	// EnvEscrowAddress optionally overrides DefaultEscrowAddress.
 	EnvEscrowAddress = "ESCROW_ADDRESS"
+	// EnvStartBlockLookback optionally overrides StartBlockLookback, so an
+	// operator can catch up on disputes older than the default window.
+	EnvStartBlockLookback = "START_BLOCK_LOOKBACK"
 )
 
 // Chain configuration. Base Sepolia only -- ChainID is compared against
@@ -57,7 +60,9 @@ const (
 	// providers do not reject the request.
 	BlockRangeChunkSize uint64 = 500
 	// StartBlockLookback is how many blocks behind head the agent begins
-	// scanning on a cold start.
+	// scanning on a cold start. At Base Sepolia's ~2s blocks this is roughly
+	// three hours; a dispute older than that is invisible to a fresh agent
+	// unless START_BLOCK_LOOKBACK is raised.
 	StartBlockLookback uint64 = 5000
 	// BlockConfirmations is how far behind head the agent stops scanning, so
 	// it never rules on a reorged log.

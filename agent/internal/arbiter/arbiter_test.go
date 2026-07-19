@@ -488,3 +488,58 @@ func TestRealTicker(t *testing.T) {
 		t.Fatal("RealTicker did not fire")
 	}
 }
+
+// TestPollLookbackOverride covers the configurable cold-start window.
+//
+// This exists because of a real miss: with the default 5000-block lookback a
+// fresh agent began scanning ten blocks past a live dispute and never saw it.
+// Raising the window is how an operator catches up on disputes older than the
+// default, so the override has to actually move the first scanned block.
+func TestPollLookbackOverride(t *testing.T) {
+	const head = 100_000
+
+	tests := []struct {
+		name      string
+		lookback  uint64
+		wantFirst uint64
+	}{
+		{
+			name:      "zero falls back to the compiled default",
+			lookback:  0,
+			wantFirst: head - config.BlockConfirmations - config.StartBlockLookback,
+		},
+		{
+			name:      "a wider window starts further back",
+			lookback:  50_000,
+			wantFirst: head - config.BlockConfirmations - 50_000,
+		},
+		{
+			name:      "a narrower window starts closer to head",
+			lookback:  10,
+			wantFirst: head - config.BlockConfirmations - 10,
+		},
+		{
+			name:      "a window deeper than the chain clamps to block 1",
+			lookback:  head * 2,
+			wantFirst: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := &fakeReader{head: head, state: config.StateDisputed}
+			arb := newArbiter(reader, &fakeModel{}, &fakeResolver{}, &bytes.Buffer{})
+			arb.Lookback = tt.lookback
+
+			if err := arb.Poll(t.Context()); err != nil {
+				t.Fatalf("Poll() unexpected error: %v", err)
+			}
+			if len(reader.ranges) != 1 {
+				t.Fatalf("scanned %d ranges, want 1", len(reader.ranges))
+			}
+			if got := reader.ranges[0][0]; got != tt.wantFirst {
+				t.Errorf("first scanned block = %d, want %d", got, tt.wantFirst)
+			}
+		})
+	}
+}

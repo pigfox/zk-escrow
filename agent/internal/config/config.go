@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -27,6 +28,10 @@ var (
 		" must be " + ProviderAnthropic + " or " + ProviderOpenAI)
 	// ErrInvalidEscrowAddress means ESCROW_ADDRESS was not a hex address.
 	ErrInvalidEscrowAddress = errors.New("config: " + EnvEscrowAddress + " is not a valid address")
+	// ErrInvalidStartBlockLookback means START_BLOCK_LOOKBACK was not a
+	// positive integer.
+	ErrInvalidStartBlockLookback = errors.New("config: " + EnvStartBlockLookback +
+		" must be a positive whole number of blocks")
 	// ErrInvalidRPCURL means RPC_URL was not a usable http(s) URL.
 	ErrInvalidRPCURL = errors.New("config: " + EnvRPCURL + " is not a valid http(s) URL")
 )
@@ -35,6 +40,10 @@ var (
 const (
 	schemeHTTP  = "http"
 	schemeHTTPS = "https"
+
+	// Parsing parameters for START_BLOCK_LOOKBACK.
+	decimalBase = 10
+	bitSize64   = 64
 )
 
 // Config is the fully validated runtime configuration. Every field is derived
@@ -55,6 +64,8 @@ type Config struct {
 	// OpenAIAPIKey authenticates to the Chat Completions API. Never logged.
 	// Empty unless AIProvider is ProviderOpenAI.
 	OpenAIAPIKey string
+	// StartBlockLookback is how far behind head a cold start begins scanning.
+	StartBlockLookback uint64
 	// ChainID is always ChainID (Base Sepolia).
 	ChainID int64
 }
@@ -105,6 +116,15 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	lookback := StartBlockLookback
+	if override := os.Getenv(EnvStartBlockLookback); override != "" {
+		parsed, err := strconv.ParseUint(override, decimalBase, bitSize64)
+		if err != nil || parsed == 0 {
+			return Config{}, fmt.Errorf("%w: got %q", ErrInvalidStartBlockLookback, override)
+		}
+		lookback = parsed
+	}
+
 	escrowAddress := DefaultEscrowAddress
 	if override := os.Getenv(EnvEscrowAddress); override != "" {
 		escrowAddress = override
@@ -120,7 +140,9 @@ func Load() (Config, error) {
 		AIProvider:      provider,
 		AnthropicAPIKey: anthropicKey,
 		OpenAIAPIKey:    openAIKey,
-		ChainID:         ChainID,
+
+		StartBlockLookback: lookback,
+		ChainID:            ChainID,
 	}, nil
 }
 

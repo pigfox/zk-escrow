@@ -92,6 +92,8 @@ func Run(ctx context.Context, out io.Writer) int {
 	logger.Printf(config.LogStarting,
 		cfg.RPCURL, cfg.EscrowAddress.Hex(), cfg.ChainID, modelName)
 
-	arbiter.New(reader, model, resolver, logger).Run(ctx, newTicker())
+	judge := arbiter.New(reader, model, resolver, logger)
+	judge.Lookback = cfg.StartBlockLookback
+	judge.Run(ctx, newTicker())
 	return config.ExitOK
 }

@@ -64,6 +64,10 @@ type Arbiter struct {
 	// Logger receives progress and errors. Never receives a secret.
 	Logger *log.Logger
 
+	// Lookback is how far behind head a cold start begins scanning. Zero
+	// means use config.StartBlockLookback.
+	Lookback uint64
+
 	// nextBlock is the first block of the next scan window. Zero means the
 	// arbiter has not yet chosen a starting point.
 	nextBlock uint64
@@ -106,8 +110,12 @@ func (a *Arbiter) Poll(ctx context.Context) error {
 	safe := head - config.BlockConfirmations
 
 	if a.nextBlock == 0 {
-		if safe > config.StartBlockLookback {
-			a.nextBlock = safe - config.StartBlockLookback
+		lookback := a.Lookback
+		if lookback == 0 {
+			lookback = config.StartBlockLookback
+		}
+		if safe > lookback {
+			a.nextBlock = safe - lookback
 		} else {
 			a.nextBlock = 1
 		}

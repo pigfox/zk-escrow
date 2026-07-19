@@ -116,6 +116,10 @@ The arbiter's reasoning backend is pluggable: Claude is the default, and setting
 behind the same prompt and the same `{ruling, rationale}` contract — only the
 selected provider's key is required, and the agent refuses to start without it.
 
+On a cold start the agent scans back `START_BLOCK_LOOKBACK` blocks (default
+5000, roughly three hours of Base Sepolia). A dispute older than that window is
+invisible to a fresh agent, so raise it when catching up on a backlog.
+
 ---
 
 ## Cast one-liners
@@ -450,6 +454,7 @@ set -a; source ../.env; set +a
 | `ANTHROPIC_API_KEY` | agent only, when `AI_PROVIDER` is `anthropic` (the default) |
 | `OPENAI_API_KEY` | agent only, when `AI_PROVIDER=openai` |
 | `AI_PROVIDER` | optional — `anthropic` (default) or `openai` |
+| `START_BLOCK_LOOKBACK` | optional — cold-start scan depth in blocks (default 5000, ~3h) |
 | `ESCROW_ADDRESS` | demos, agent (after deploy) |
 | `ETHERSCAN_API_KEY` | optional — BaseScan verification |
 

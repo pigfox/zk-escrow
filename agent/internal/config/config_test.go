@@ -26,6 +26,7 @@ func setEnv(t *testing.T, vars map[string]string) {
 		config.EnvAIProvider,
 		config.EnvRPCURL,
 		config.EnvEscrowAddress,
+		config.EnvStartBlockLookback,
 	} {
 		t.Setenv(name, vars[name])
 	}
@@ -305,5 +306,60 @@ func TestUnknownProviderErrorNamesTheOffendingValue(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error does not list the valid value %q: %v", want, err)
 		}
+	}
+}
+
+// TestLoadStartBlockLookback covers the cold-start scan window override.
+//
+// The default is roughly three hours of Base Sepolia blocks, so a dispute
+// older than that is invisible to a fresh agent unless this is raised — which
+// is exactly the situation the override exists for.
+func TestLoadStartBlockLookback(t *testing.T) {
+	base := map[string]string{
+		config.EnvPrivateKey:      testKey,
+		config.EnvAnthropicAPIKey: testAPIKey,
+		config.EnvEscrowAddress:   testAddress,
+	}
+
+	tests := []struct {
+		name     string
+		override string
+		want     uint64
+		wantErr  error
+	}{
+		{name: "unset falls back to the default", override: "", want: config.StartBlockLookback},
+		{name: "explicit override is honoured", override: "20000", want: 20000},
+		{name: "a single block is valid", override: "1", want: 1},
+		{name: "zero is rejected", override: "0", wantErr: config.ErrInvalidStartBlockLookback},
+		{name: "negative is rejected", override: "-5", wantErr: config.ErrInvalidStartBlockLookback},
+		{name: "non-numeric is rejected", override: "lots", wantErr: config.ErrInvalidStartBlockLookback},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			env := make(map[string]string, len(base)+1)
+			for k, v := range base {
+				env[k] = v
+			}
+			env[config.EnvStartBlockLookback] = tt.override
+			setEnv(t, env)
+
+			cfg, err := config.Load()
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Load() error = %v, want %v", err, tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.override) {
+					t.Errorf("error does not name the bad value %q: %v", tt.override, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() unexpected error: %v", err)
+			}
+			if cfg.StartBlockLookback != tt.want {
+				t.Errorf("StartBlockLookback = %d, want %d", cfg.StartBlockLookback, tt.want)
+			}
+		})
 	}
 }
