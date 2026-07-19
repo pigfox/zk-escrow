@@ -22,6 +22,73 @@ winner but can never pay itself.
 
 ---
 
+## Live on Base Sepolia
+
+| Contract | Address |
+| --- | --- |
+| **Proxy** ← interact with this | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84#code) |
+| Implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4#code) |
+| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56#code) |
+
+All three verified on BaseScan. Chain id 84532.
+
+Four escrows have run to completion: **#0 and #1 released by zero-knowledge
+proof**, **#2 and #3 settled by the AI arbiter**. Across all four the arbiter
+routed 0.003 ETH between buyers and sellers and took **nothing** — its
+`pendingWithdrawals` balance is `0`, and the contract's ETH balance equals
+`totalPendingWithdrawals` to the wei. Invariants (a) and (b) below are not just
+fuzzer output; they held against real traffic.
+
+---
+
+## The AI rulings
+
+Both disputes were decided by a model reading the parties' on-chain evidence,
+and both rationales are stored verbatim in the `DisputeResolved` event. Nothing
+below is paraphrased — it is what the chain says.
+
+### Escrow #3 — both sides heard
+[`0x8725c2e7…`](https://sepolia.basescan.org/tx/0x8725c2e7e78baea855f82a744733f16112aa9bc7aeb6fbb0060be6c61f281a8d)
+· ruling **SellerWins** · 0.001 ETH to the seller
+
+The buyer complained the tracking number was unrecognised and nothing arrived.
+Taken alone that reads as non-delivery. The seller then conceded the number was
+mistyped, supplied the corrected one, and cited a signed proof of delivery. The
+model weighed the two accounts against each other and **reversed the naive
+reading**, because a corrected-and-evidenced account beats an unevidenced one:
+
+> Buyer: you provided that the tracking number you received was unrecognized and
+> that nothing arrived, but you did not provide any evidence of non-delivery
+> (e.g., carrier claim, return, or proof you never received the package).
+> Seller: you credibly corrected the tracking number (explaining the buyer’s
+> mistype) and provided that the carrier shows the shipment as delivered and
+> signed for on the 5th, with signed proof-of-delivery available. With delivery
+> confirmation and no counter-evidence from the Buyer, the escrow should be
+> released to the Seller.
+
+### Escrow #2 — arbitration on an incomplete record
+[`0xd79a68d3…`](https://sepolia.basescan.org/tx/0xd79a68d3222bac8bcac4f4ebc6f7f41991a964468678a4e28e024e1f773e5fb5)
+· ruling **BuyerWins** · 0.001 ETH to the buyer
+
+Only the buyer's evidence reached the chain here: the seller's `submitEvidence`
+transaction was the one killed by the sweeper bug described in
+[Lessons from a live testnet](#lessons-from-a-live-testnet). The model ruled on
+what it actually had, which is the honest behaviour — but it is a one-sided
+record, and the ruling should be read as such:
+
+> Buyer provided evidence of timely payment (on the 3rd) and requested next-day
+> delivery of a hardware wallet, but the item did not arrive. The tracking
+> number provided by the Seller (1Z999AA10123456784) is not recognized by the
+> carrier, and Buyer states they asked twice for a replacement tracking number
+> and received no response. This supports non-delivery and lack of timely
+> communication by the Seller, so the Buyer should be awarded the escrow.
+
+Whatever the model decides, the contract bounds the damage: `resolveDispute`
+takes a *side*, not a destination, so a wrong ruling misroutes between the two
+parties and can never pay the arbiter. See [Trust model](#trust-model).
+
+---
+
 ## Architecture
 
 ```mermaid
@@ -97,6 +164,21 @@ they know `s` such that `Poseidon(s) == commitment`, and the proof releases the
 escrow. Note who sends the release transaction: it does not matter. `release()`
 is authorized by the proof, not by `msg.sender`.
 
+Escrows [#0](https://sepolia.basescan.org/tx/0xdf38bcdc280addfb012696c6e5fcc6655abedf1648727c012d2f7e096e5a03d7)
+and [#1](https://sepolia.basescan.org/tx/0xfedaf8127505c68bc759b86f35dc0158572f5d527844f03794dce7f2acb65f87)
+did exactly that on chain — the same secret, so an identical commitment, but a
+different nullifier each, both now spent:
+
+```
+commitment (both)   4267533774488295900887461483015112262021273608761099826938271132511348470966
+nullifier escrow #0  540663689097534992617434090946771188169151136163418449976754366008491461789
+nullifier escrow #1 4213355460611018654523924795294902999663126022355729006200928612083214729114
+```
+
+That difference is the anti-replay property, live: the nullifier is
+`Poseidon(secret, escrowId)`, so escrow #0's proof is not merely rejected
+against escrow #1 — it is unprovable there.
+
 ### Act II — the AI dispute path
 
 ```bash
@@ -111,14 +193,32 @@ for a ruling as strict JSON, prints the exact `cast send` it is about to run
 (with the key redacted), and executes it. The full rationale is emitted on chain
 in the `DisputeResolved` event.
 
-The arbiter's reasoning backend is pluggable: Claude is the default, and setting
-`AI_PROVIDER=openai` with an `OPENAI_API_KEY` swaps in OpenAI Chat Completions
-behind the same prompt and the same `{ruling, rationale}` contract — only the
-selected provider's key is required, and the agent refuses to start without it.
+#### Agent configuration
 
-On a cold start the agent scans back `START_BLOCK_LOOKBACK` blocks (default
-5000, roughly three hours of Base Sepolia). A dispute older than that window is
-invisible to a fresh agent, so raise it when catching up on a backlog.
+Read from the environment only — `source ../.env` before running.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `AI_PROVIDER` | `anthropic` | Reasoning backend: `anthropic` or `openai`. |
+| `ANTHROPIC_API_KEY` | — | Required when `AI_PROVIDER=anthropic`. |
+| `OPENAI_API_KEY` | — | Required when `AI_PROVIDER=openai`. |
+| `START_BLOCK_LOOKBACK` | `5000` | Cold-start scan depth, in blocks. |
+| `ESCROW_ADDRESS` | — | The deployed proxy. |
+| `PRIVATE_KEY` | — | The arbiter's signing key. Never logged. |
+
+The backend is pluggable because the prompt and the `{ruling, rationale}`
+contract are identical either way — only the request envelope differs, so a
+ruling does not depend on the vendor. **Only the selected provider's key is
+required**: an operator on OpenAI is never asked for an Anthropic key, and the
+agent refuses to start if the one it needs is missing, rather than discovering
+it on the first dispute. Escrows #2 and #3 above were settled through the OpenAI
+backend while Anthropic billing was blocked.
+
+`START_BLOCK_LOOKBACK` matters more than it looks: at Base Sepolia's ~2s blocks
+the 5000-block default is only about three hours, and a dispute older than that
+is invisible to a fresh agent — see
+[Lessons from a live testnet](#lessons-from-a-live-testnet). Raise it when
+catching up on a backlog.
 
 ---
 
@@ -312,6 +412,52 @@ survives them.
 
 ---
 
+## Lessons from a live testnet
+
+Everything below was found by running against Base Sepolia, not by testing.
+Each one passed unit tests, CI, both fuzzers and Slither first.
+
+**snarkjs and cast disagree about arrays.** snarkjs exports proof points as
+quoted, comma-space JSON (`["0xab", "0xcd"]`); `cast` array literals are bare
+and unspaced (`[0xab,0xcd]`) and it rejects the other form outright. Act I died
+at the release step on the first run. `prove.sh` now emits both encodings —
+`pA`/`pB`/`pC` for the Solidity fixtures, `castPA`/`castPB`/`castPC` for
+anything shelling out.
+
+**Published test keys are actively swept, and the failure is misdirected.** The
+demos originally used the standard Anvil accounts for the throwaway
+seller/buyer. Their private keys ship with every Foundry install, so on a public
+testnet they are drained continuously — Base Sepolia's Anvil #4 sits at nonce
+229 and carries an **EIP-7702 delegation** (`0xef0100…`) to a sweeper contract.
+Funding it does not fail; the transfer succeeds and is forwarded away
+atomically in the same transaction, leaving the account at zero. The symptom
+surfaces three steps later as `gas required exceeds allowance (0)`, which points
+at entirely the wrong thing. The demos now generate real random identities on
+first run and cache them in a gitignored, `0600` `.demo-keys.env`, and
+`fund_to()` re-reads the balance after transferring rather than trusting the
+receipt.
+
+**Redaction as a list of names silently rots.** `run()` masked `PRIVATE_KEY` and
+`SELLER_KEY` before echoing each `cast` command — but a later edit introduced
+`SELLER2_KEY`, which printed in clear. It happened to be a published key, so
+nothing secret leaked, but the same logic would have leaked an operator's. The
+enumerated list is now a registry: keys are registered as they are obtained and
+`run()` masks anything in it, so adding a key cannot quietly bypass redaction.
+
+**100% statement coverage did not catch a ten-block miss.** The agent begins
+scanning `StartBlockLookback` blocks behind head, and 5000 blocks is about three
+hours of Base Sepolia. By the time the disputes were settled they had aged past
+that: a fresh agent started at block 44347290 while escrow #3's dispute sat at
+44347280 — **ten blocks out of reach** — and reported nothing at all rather than
+an error. `START_BLOCK_LOOKBACK` now overrides the window. The regression test
+asserts the override *moves the first scanned block*, not merely that the branch
+executes; branch-execution coverage was already 100% and would have missed this
+exactly as it did the first time.
+
+The through-line: the contract logic was fine every time. What broke was
+everything around it — encodings, key hygiene, operational windows — which is
+the part a test suite is worst at reaching.
+
 ## Trust model
 
 The interesting question is not "is the AI right?" but "what happens when it is
@@ -360,16 +506,11 @@ than implying otherwise.
 
 ---
 
-## Deployed addresses (Base Sepolia)
+## Deployment reference
 
-Live on **Base Sepolia, chain id 84532**, deployed 2026-07-19.
-
-| Contract | Address | Source | |
-| --- | --- | --- | --- |
-| **Proxy** ← interact with this | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84#code) | ✅ verified | ERC-1967, initialized |
-| Implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4#code) | ✅ verified | `EscrowUpgradeable` |
-| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56#code) | ✅ verified | `Groth16Verifier` |
-| Owner | [`0x49FE3B2731090b93d297D259BD1eFFC5DB015edF`](https://sepolia.basescan.org/address/0x49FE3B2731090b93d297D259BD1eFFC5DB015edF) | — | upgrade authority |
+The three addresses are at the [top of this README](#live-on-base-sepolia).
+Deployed 2026-07-19 to chain id 84532; the upgrade authority is
+[`0x49FE3B27…`](https://sepolia.basescan.org/address/0x49FE3B2731090b93d297D259BD1eFFC5DB015edF).
 
 ```bash
 export ESCROW_ADDRESS=0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84
