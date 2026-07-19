@@ -152,7 +152,12 @@ func (c *HTTPClient) Complete(ctx context.Context, systemPrompt, userPrompt stri
 	}
 
 	if resp.StatusCode != config.HTTPStatusOK {
-		return "", fmt.Errorf("%w: %d", ErrUnexpectedStatus, resp.StatusCode)
+		// Include the API's own message. The status alone is close to useless
+		// for diagnosis: a 400 covers a malformed request, an unknown model
+		// and an exhausted credit balance alike, and only the body says which.
+		// The body carries the error description, never the request or the key.
+		return "", fmt.Errorf("%w: %d: %s",
+			ErrUnexpectedStatus, resp.StatusCode, truncate(string(raw), config.ErrorBodyMaxLen))
 	}
 
 	var decoded response
@@ -222,4 +227,14 @@ func BuildPrompt(dispute escrow.Dispute) string {
 	}
 	b.WriteString(config.PromptFooter)
 	return b.String()
+}
+
+// truncate bounds an error body so a runaway response cannot flood the log,
+// while keeping enough of it to be diagnostic.
+func truncate(s string, limit int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= limit {
+		return s
+	}
+	return s[:limit] + config.TruncationSuffix
 }

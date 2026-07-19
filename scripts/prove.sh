@@ -86,6 +86,15 @@ PA="$(echo "$CALLDATA" | sed -n 's/^\(\[[^]]*\]\),\[\[.*/\1/p')"
 PB="$(echo "$CALLDATA" | sed -n 's/^\[[^]]*\],\(\[\[[^]]*\],\[[^]]*\]\]\),\[.*/\1/p')"
 PC="$(echo "$CALLDATA" | sed -n 's/.*\]\],\(\[[^]]*\]\),\[[^]]*\]$/\1/p')"
 
+# snarkjs emits the proof points as a JSON array — quoted, comma-space
+# separated. `cast` will not parse that: its array literals are bare and
+# unspaced, e.g. [0xab,0xcd]. Keep both forms rather than making callers guess
+# which one they need — the JSON `pA`/`pB`/`pC` for the Solidity fixtures, and
+# `castPA`/`castPB`/`castPC` for anything shelling out to cast.
+PA_CAST="$(echo "$PA" | tr -d '" ')"
+PB_CAST="$(echo "$PB" | tr -d '" ')"
+PC_CAST="$(echo "$PC" | tr -d '" ')"
+
 # All field elements are written as 0x-hex so Solidity fixtures can read them
 # with vm.parseBytes32; the decimal forms are kept alongside for humans and for
 # pasting into `cast`.
@@ -99,7 +108,10 @@ cat > "$OUT_DIR/release-args.json" <<EOF
   "nullifierDecimal": "$NULLIFIER",
   "pA": $PA,
   "pB": $PB,
-  "pC": $PC
+  "pC": $PC,
+  "castPA": "$PA_CAST",
+  "castPB": "$PB_CAST",
+  "castPC": "$PC_CAST"
 }
 EOF
 
@@ -107,11 +119,11 @@ echo
 echo "commitment (pass to createEscrow): $COMMITMENT"
 echo "nullifier  (pass to release):      $NULLIFIER"
 echo
-echo "release() arguments:"
+echo "release() arguments, ready to paste into cast:"
 echo "  escrowId  $ESCROW_ID"
 echo "  nullifier $NULLIFIER"
-echo "  pA        $PA"
-echo "  pB        $PB"
-echo "  pC        $PC"
+echo "  pA        $PA_CAST"
+echo "  pB        $PB_CAST"
+echo "  pC        $PC_CAST"
 echo
 echo "artifacts: $OUT_DIR/{proof.json,public.json,calldata.txt,release-args.json}"

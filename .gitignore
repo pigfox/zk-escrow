@@ -62,3 +62,6 @@ crytic-export/
 echidna-corpus/
 slither_results.json
 coverage-summary.txt
+
+# Throwaway demo identities, generated on first demo run. Never commit.
+.demo-keys.env

@@ -140,6 +140,11 @@ const (
 	HTTPMethodPost = "POST"
 	// HTTPStatusOK is the only status the agent accepts.
 	HTTPStatusOK = 200
+	// ErrorBodyMaxLen bounds how much of a non-200 response body is quoted
+	// back in the error, so a runaway response cannot flood the log.
+	ErrorBodyMaxLen = 512
+	// TruncationSuffix marks a body clipped at ErrorBodyMaxLen.
+	TruncationSuffix = "... (truncated)"
 
 	// RoleUser is the Messages API role for the arbiter's prompt.
 	RoleUser = "user"

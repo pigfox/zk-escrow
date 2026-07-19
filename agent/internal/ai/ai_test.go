@@ -323,3 +323,49 @@ func TestCompleteErrors(t *testing.T) {
 		})
 	}
 }
+
+// TestCompleteSurfacesTheAPIErrorBody pins the diagnostic that a bare status
+// code lacks. A 400 from the Messages API covers a malformed request, an
+// unknown model and an exhausted credit balance alike; only the response body
+// distinguishes them, so the error has to carry it.
+func TestCompleteSurfacesTheAPIErrorBody(t *testing.T) {
+	const apiMessage = "Your credit balance is too low to access the Anthropic API."
+
+	client := ai.NewHTTPClient("key", http.DefaultClient)
+	client.HTTP = bodyTransport{
+		status: 400,
+		body: strings.NewReader(
+			`{"type":"error","error":{"message":"` + apiMessage + `"}}`),
+	}
+
+	_, err := client.Complete(t.Context(), "system", "user")
+	if !errors.Is(err, ai.ErrUnexpectedStatus) {
+		t.Fatalf("Complete() error = %v, want ErrUnexpectedStatus", err)
+	}
+	if !strings.Contains(err.Error(), apiMessage) {
+		t.Errorf("error dropped the API's own message: %v", err)
+	}
+	if !strings.Contains(err.Error(), "400") {
+		t.Errorf("error dropped the status code: %v", err)
+	}
+}
+
+// TestCompleteTruncatesAHugeErrorBody keeps a runaway response from flooding
+// the log while still leaving the front of it readable.
+func TestCompleteTruncatesAHugeErrorBody(t *testing.T) {
+	huge := strings.Repeat("x", config.ErrorBodyMaxLen*3)
+
+	client := ai.NewHTTPClient("key", http.DefaultClient)
+	client.HTTP = bodyTransport{status: 500, body: strings.NewReader(huge)}
+
+	_, err := client.Complete(t.Context(), "system", "user")
+	if !errors.Is(err, ai.ErrUnexpectedStatus) {
+		t.Fatalf("Complete() error = %v, want ErrUnexpectedStatus", err)
+	}
+	if !strings.Contains(err.Error(), config.TruncationSuffix) {
+		t.Errorf("oversized body was not marked as truncated: %v", err)
+	}
+	if len(err.Error()) > config.ErrorBodyMaxLen*2 {
+		t.Errorf("error is %d bytes, expected the body to be clipped", len(err.Error()))
+	}
+}
