@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"strings"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/core/types"
 
+	"github.com/pigfox/zk-escrow/agent/internal/ai"
 	"github.com/pigfox/zk-escrow/agent/internal/arbiter"
 	"github.com/pigfox/zk-escrow/agent/internal/config"
 )
@@ -162,4 +164,89 @@ func TestDefaultNewTicker(t *testing.T) {
 		t.Fatal("newTicker() returned nil")
 	}
 	ticker.Stop()
+}
+
+// TestNewModelClientSelectsTheProvider covers the wiring fork: the selected
+// provider must produce that vendor's client, and the banner must name the
+// model actually in use rather than a hardcoded one.
+//
+// config.Load has already rejected anything outside these two values, so the
+// only cases here are the two valid ones plus the defensive fallback.
+func TestNewModelClientSelectsTheProvider(t *testing.T) {
+	tests := []struct {
+		name      string
+		cfg       config.Config
+		wantModel string
+		wantType  string
+	}{
+		{
+			name: "anthropic",
+			cfg: config.Config{
+				AIProvider:      config.ProviderAnthropic,
+				AnthropicAPIKey: "sk-ant",
+			},
+			wantModel: config.AnthropicModel,
+			wantType:  "*ai.HTTPClient",
+		},
+		{
+			name: "openai",
+			cfg: config.Config{
+				AIProvider:   config.ProviderOpenAI,
+				OpenAIAPIKey: "sk-openai",
+			},
+			wantModel: config.OpenAIModel,
+			wantType:  "*ai.OpenAIClient",
+		},
+		{
+			name: "an unset provider falls back to the documented default",
+			cfg: config.Config{
+				AnthropicAPIKey: "sk-ant",
+			},
+			wantModel: config.AnthropicModel,
+			wantType:  "*ai.HTTPClient",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, model := newModelClient(tt.cfg)
+
+			if model != tt.wantModel {
+				t.Errorf("model = %q, want %q", model, tt.wantModel)
+			}
+			if got := fmt.Sprintf("%T", client); got != tt.wantType {
+				t.Errorf("client type = %s, want %s", got, tt.wantType)
+			}
+		})
+	}
+}
+
+// TestNewModelClientCarriesTheRightKey guards against the two providers being
+// wired to each other's credentials.
+func TestNewModelClientCarriesTheRightKey(t *testing.T) {
+	anthropic, _ := newModelClient(config.Config{
+		AIProvider:      config.ProviderAnthropic,
+		AnthropicAPIKey: "sk-ant",
+		OpenAIAPIKey:    "sk-openai",
+	})
+	typed, ok := anthropic.(*ai.HTTPClient)
+	if !ok {
+		t.Fatalf("expected *ai.HTTPClient, got %T", anthropic)
+	}
+	if typed.APIKey != "sk-ant" {
+		t.Error("anthropic client did not receive the anthropic key")
+	}
+
+	openAI, _ := newModelClient(config.Config{
+		AIProvider:      config.ProviderOpenAI,
+		AnthropicAPIKey: "sk-ant",
+		OpenAIAPIKey:    "sk-openai",
+	})
+	typedOpenAI, ok := openAI.(*ai.OpenAIClient)
+	if !ok {
+		t.Fatalf("expected *ai.OpenAIClient, got %T", openAI)
+	}
+	if typedOpenAI.APIKey != "sk-openai" {
+		t.Error("openai client did not receive the openai key")
+	}
 }

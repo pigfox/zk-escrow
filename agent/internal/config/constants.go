@@ -18,8 +18,15 @@ import (
 const (
 	// EnvPrivateKey is the arbiter's private key. Required.
 	EnvPrivateKey = "PRIVATE_KEY"
-	// EnvAnthropicAPIKey is the Anthropic API key. Required.
+	// EnvAnthropicAPIKey is the Anthropic API key. Required when the selected
+	// provider is ProviderAnthropic.
 	EnvAnthropicAPIKey = "ANTHROPIC_API_KEY"
+	// EnvOpenAIAPIKey is the OpenAI API key. Required when the selected
+	// provider is ProviderOpenAI.
+	EnvOpenAIAPIKey = "OPENAI_API_KEY"
+	// EnvAIProvider selects which model backend arbitrates. Optional;
+	// defaults to DefaultAIProvider.
+	EnvAIProvider = "AI_PROVIDER"
 	// EnvRPCURL optionally overrides DefaultRPCURL.
 	EnvRPCURL = "RPC_URL"
 	// EnvEscrowAddress optionally overrides DefaultEscrowAddress.
@@ -112,6 +119,42 @@ const (
 const (
 	RulingBuyerWinsString  = "BuyerWins"
 	RulingSellerWinsString = "SellerWins"
+)
+
+// Model providers. The arbiter's reasoning backend is pluggable: the same
+// structured prompt and the same {ruling, rationale} JSON contract are used
+// whichever one is selected, so a ruling does not depend on the vendor.
+const (
+	// ProviderAnthropic selects the Anthropic Messages API.
+	ProviderAnthropic = "anthropic"
+	// ProviderOpenAI selects the OpenAI Chat Completions API.
+	ProviderOpenAI = "openai"
+	// DefaultAIProvider is used when AI_PROVIDER is unset. Claude is the
+	// documented default.
+	DefaultAIProvider = ProviderAnthropic
+)
+
+// OpenAI API surface. Mirrors the Anthropic block: same prompt, same JSON
+// contract, different envelope.
+const (
+	// OpenAIBaseURL is the Chat Completions endpoint.
+	OpenAIBaseURL = "https://api.openai.com/v1/chat/completions"
+	// OpenAIModel is the model the arbiter reasons with when the OpenAI
+	// provider is selected.
+	OpenAIModel = "gpt-5.4-nano"
+	// OpenAIMaxTokens bounds the model's reply.
+	OpenAIMaxTokens = 1024
+	// OpenAITimeout bounds a single API round trip.
+	OpenAITimeout = 60 * time.Second
+
+	// HeaderAuthorization carries the bearer token.
+	HeaderAuthorization = "Authorization"
+	// BearerPrefix prefixes the OpenAI API key in HeaderAuthorization.
+	BearerPrefix = "Bearer "
+
+	// RoleSystem is the Chat Completions role carrying the system prompt.
+	// Anthropic takes the system prompt as a top-level field instead.
+	RoleSystem = "system"
 )
 
 // Anthropic API surface.

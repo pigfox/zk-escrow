@@ -45,6 +45,23 @@ func defaultDial(ctx context.Context, rawURL string) (nodeClient, error) {
 	return ethclient.DialContext(ctx, rawURL)
 }
 
+// newModelClient builds the reasoning backend the operator selected, and
+// returns it alongside the model name for the startup banner.
+//
+// config.Load has already rejected any provider other than these two and
+// verified that the selected one has a key, so there is no unknown-provider
+// case left to handle here.
+func newModelClient(cfg config.Config) (client ai.Client, modelName string) {
+	if cfg.AIProvider == config.ProviderOpenAI {
+		return ai.NewOpenAIClient(cfg.OpenAIAPIKey, &http.Client{
+			Timeout: config.OpenAITimeout,
+		}), config.OpenAIModel
+	}
+	return ai.NewHTTPClient(cfg.AnthropicAPIKey, &http.Client{
+		Timeout: config.AnthropicTimeout,
+	}), config.AnthropicModel
+}
+
 // Run loads configuration, builds the arbiter and polls until ctx is
 // cancelled. It returns the process exit code.
 func Run(ctx context.Context, out io.Writer) int {
@@ -69,13 +86,11 @@ func Run(ctx context.Context, out io.Writer) int {
 		return config.ExitChainError
 	}
 
-	model := ai.NewHTTPClient(cfg.AnthropicAPIKey, &http.Client{
-		Timeout: config.AnthropicTimeout,
-	})
+	model, modelName := newModelClient(cfg)
 	resolver := executor.New(executor.ExecRunner{}, logger, cfg)
 
 	logger.Printf(config.LogStarting,
-		cfg.RPCURL, cfg.EscrowAddress.Hex(), cfg.ChainID, config.AnthropicModel)
+		cfg.RPCURL, cfg.EscrowAddress.Hex(), cfg.ChainID, modelName)
 
 	arbiter.New(reader, model, resolver, logger).Run(ctx, newTicker())
 	return config.ExitOK

@@ -2,6 +2,7 @@ package config_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/pigfox/zk-escrow/agent/internal/config"
@@ -10,6 +11,7 @@ import (
 const (
 	testKey     = "0xabc123"
 	testAPIKey  = "sk-ant-test"
+	testOpenAI  = "sk-openai-test"
 	testAddress = "0x1234567890123456789012345678901234567890"
 )
 
@@ -20,6 +22,8 @@ func setEnv(t *testing.T, vars map[string]string) {
 	for _, name := range []string{
 		config.EnvPrivateKey,
 		config.EnvAnthropicAPIKey,
+		config.EnvOpenAIAPIKey,
+		config.EnvAIProvider,
 		config.EnvRPCURL,
 		config.EnvEscrowAddress,
 	} {
@@ -161,5 +165,145 @@ func TestRulingEnumMatchesSolidity(t *testing.T) {
 	}
 	if config.StateDisputed != 5 {
 		t.Errorf("StateDisputed = %d, want 5", config.StateDisputed)
+	}
+}
+
+// TestLoadProviderSelection covers which model key is required for which
+// AI_PROVIDER. The point is that an operator running against OpenAI is never
+// asked for an Anthropic key, and vice versa.
+func TestLoadProviderSelection(t *testing.T) {
+	tests := []struct {
+		name          string
+		env           map[string]string
+		wantErr       error
+		wantProvider  string
+		wantAnthropic string
+		wantOpenAI    string
+	}{
+		{
+			name: "unset provider defaults to anthropic",
+			env: map[string]string{
+				config.EnvPrivateKey:      testKey,
+				config.EnvAnthropicAPIKey: testAPIKey,
+				config.EnvEscrowAddress:   testAddress,
+			},
+			wantProvider:  config.ProviderAnthropic,
+			wantAnthropic: testAPIKey,
+		},
+		{
+			name: "explicit anthropic",
+			env: map[string]string{
+				config.EnvPrivateKey:      testKey,
+				config.EnvAnthropicAPIKey: testAPIKey,
+				config.EnvAIProvider:      config.ProviderAnthropic,
+				config.EnvEscrowAddress:   testAddress,
+			},
+			wantProvider:  config.ProviderAnthropic,
+			wantAnthropic: testAPIKey,
+		},
+		{
+			name: "openai needs only the openai key",
+			env: map[string]string{
+				config.EnvPrivateKey:    testKey,
+				config.EnvOpenAIAPIKey:  testOpenAI,
+				config.EnvAIProvider:    config.ProviderOpenAI,
+				config.EnvEscrowAddress: testAddress,
+			},
+			wantProvider: config.ProviderOpenAI,
+			wantOpenAI:   testOpenAI,
+		},
+		{
+			name: "provider value is case and space insensitive",
+			env: map[string]string{
+				config.EnvPrivateKey:    testKey,
+				config.EnvOpenAIAPIKey:  testOpenAI,
+				config.EnvAIProvider:    "  OpenAI  ",
+				config.EnvEscrowAddress: testAddress,
+			},
+			wantProvider: config.ProviderOpenAI,
+			wantOpenAI:   testOpenAI,
+		},
+		{
+			name: "anthropic selected but its key is empty",
+			env: map[string]string{
+				config.EnvPrivateKey:    testKey,
+				config.EnvOpenAIAPIKey:  testOpenAI,
+				config.EnvAIProvider:    config.ProviderAnthropic,
+				config.EnvEscrowAddress: testAddress,
+			},
+			wantErr: config.ErrMissingAnthropicAPIKey,
+		},
+		{
+			name: "openai selected but its key is empty",
+			env: map[string]string{
+				config.EnvPrivateKey:      testKey,
+				config.EnvAnthropicAPIKey: testAPIKey,
+				config.EnvAIProvider:      config.ProviderOpenAI,
+				config.EnvEscrowAddress:   testAddress,
+			},
+			wantErr: config.ErrMissingOpenAIAPIKey,
+		},
+		{
+			name: "unknown provider is rejected",
+			env: map[string]string{
+				config.EnvPrivateKey:      testKey,
+				config.EnvAnthropicAPIKey: testAPIKey,
+				config.EnvOpenAIAPIKey:    testOpenAI,
+				config.EnvAIProvider:      "gemini",
+				config.EnvEscrowAddress:   testAddress,
+			},
+			wantErr: config.ErrUnknownAIProvider,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			setEnv(t, tt.env)
+
+			cfg, err := config.Load()
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Load() error = %v, want %v", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Load() unexpected error: %v", err)
+			}
+
+			if cfg.AIProvider != tt.wantProvider {
+				t.Errorf("AIProvider = %q, want %q", cfg.AIProvider, tt.wantProvider)
+			}
+			if cfg.AnthropicAPIKey != tt.wantAnthropic {
+				t.Errorf("AnthropicAPIKey was not the expected value")
+			}
+			if cfg.OpenAIAPIKey != tt.wantOpenAI {
+				t.Errorf("OpenAIAPIKey was not the expected value")
+			}
+		})
+	}
+}
+
+// TestUnknownProviderErrorNamesTheOffendingValue keeps the startup failure
+// actionable: the operator needs to see what they typed.
+func TestUnknownProviderErrorNamesTheOffendingValue(t *testing.T) {
+	setEnv(t, map[string]string{
+		config.EnvPrivateKey:      testKey,
+		config.EnvAnthropicAPIKey: testAPIKey,
+		config.EnvAIProvider:      "clyde",
+		config.EnvEscrowAddress:   testAddress,
+	})
+
+	_, err := config.Load()
+	if !errors.Is(err, config.ErrUnknownAIProvider) {
+		t.Fatalf("Load() error = %v, want ErrUnknownAIProvider", err)
+	}
+	if !strings.Contains(err.Error(), "clyde") {
+		t.Errorf("error does not name the bad value: %v", err)
+	}
+	for _, want := range []string{config.ProviderAnthropic, config.ProviderOpenAI} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error does not list the valid value %q: %v", want, err)
+		}
 	}
 }

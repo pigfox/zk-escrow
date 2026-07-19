@@ -111,6 +111,11 @@ for a ruling as strict JSON, prints the exact `cast send` it is about to run
 (with the key redacted), and executes it. The full rationale is emitted on chain
 in the `DisputeResolved` event.
 
+The arbiter's reasoning backend is pluggable: Claude is the default, and setting
+`AI_PROVIDER=openai` with an `OPENAI_API_KEY` swaps in OpenAI Chat Completions
+behind the same prompt and the same `{ruling, rationale}` contract — only the
+selected provider's key is required, and the agent refuses to start without it.
+
 ---
 
 ## Cast one-liners
@@ -442,7 +447,9 @@ set -a; source ../.env; set +a
 | --- | --- |
 | `ADDRESS` | deploy, demos |
 | `PRIVATE_KEY` | deploy, demos, agent |
-| `ANTHROPIC_API_KEY` | agent only |
+| `ANTHROPIC_API_KEY` | agent only, when `AI_PROVIDER` is `anthropic` (the default) |
+| `OPENAI_API_KEY` | agent only, when `AI_PROVIDER=openai` |
+| `AI_PROVIDER` | optional — `anthropic` (default) or `openai` |
 | `ESCROW_ADDRESS` | demos, agent (after deploy) |
 | `ETHERSCAN_API_KEY` | optional — BaseScan verification |
 

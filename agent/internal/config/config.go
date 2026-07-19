@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -13,8 +14,17 @@ import (
 var (
 	// ErrMissingPrivateKey means PRIVATE_KEY was unset or empty.
 	ErrMissingPrivateKey = errors.New("config: " + EnvPrivateKey + " is required")
-	// ErrMissingAnthropicAPIKey means ANTHROPIC_API_KEY was unset or empty.
-	ErrMissingAnthropicAPIKey = errors.New("config: " + EnvAnthropicAPIKey + " is required")
+	// ErrMissingAnthropicAPIKey means ANTHROPIC_API_KEY was unset or empty
+	// while the Anthropic provider was selected.
+	ErrMissingAnthropicAPIKey = errors.New("config: " + EnvAnthropicAPIKey +
+		" is required when " + EnvAIProvider + "=" + ProviderAnthropic)
+	// ErrMissingOpenAIAPIKey means OPENAI_API_KEY was unset or empty while the
+	// OpenAI provider was selected.
+	ErrMissingOpenAIAPIKey = errors.New("config: " + EnvOpenAIAPIKey +
+		" is required when " + EnvAIProvider + "=" + ProviderOpenAI)
+	// ErrUnknownAIProvider means AI_PROVIDER was set to something unsupported.
+	ErrUnknownAIProvider = errors.New("config: " + EnvAIProvider +
+		" must be " + ProviderAnthropic + " or " + ProviderOpenAI)
 	// ErrInvalidEscrowAddress means ESCROW_ADDRESS was not a hex address.
 	ErrInvalidEscrowAddress = errors.New("config: " + EnvEscrowAddress + " is not a valid address")
 	// ErrInvalidRPCURL means RPC_URL was not a usable http(s) URL.
@@ -36,27 +46,55 @@ type Config struct {
 	EscrowAddress common.Address
 	// PrivateKey signs resolveDispute transactions. Never logged.
 	PrivateKey string
+	// AIProvider selects the reasoning backend: ProviderAnthropic or
+	// ProviderOpenAI.
+	AIProvider string
 	// AnthropicAPIKey authenticates to the Messages API. Never logged.
+	// Empty unless AIProvider is ProviderAnthropic.
 	AnthropicAPIKey string
+	// OpenAIAPIKey authenticates to the Chat Completions API. Never logged.
+	// Empty unless AIProvider is ProviderOpenAI.
+	OpenAIAPIKey string
 	// ChainID is always ChainID (Base Sepolia).
 	ChainID int64
 }
 
 // Load reads and validates configuration from the environment.
 //
-// PRIVATE_KEY and ANTHROPIC_API_KEY are required. RPC_URL and ESCROW_ADDRESS
-// fall back to their Default* constants. The chain id is not configurable: it
-// is pinned to Base Sepolia so the agent structurally cannot broadcast to
-// mainnet.
+// PRIVATE_KEY is always required. Exactly one model API key is required — the
+// one belonging to the selected AI_PROVIDER — so an operator running against
+// OpenAI is not asked for an Anthropic key they do not have. RPC_URL and
+// ESCROW_ADDRESS fall back to their Default* constants. The chain id is not
+// configurable: it is pinned to Base Sepolia so the agent structurally cannot
+// broadcast to mainnet.
 func Load() (Config, error) {
 	privateKey := os.Getenv(EnvPrivateKey)
 	if privateKey == "" {
 		return Config{}, ErrMissingPrivateKey
 	}
 
-	apiKey := os.Getenv(EnvAnthropicAPIKey)
-	if apiKey == "" {
-		return Config{}, ErrMissingAnthropicAPIKey
+	provider := DefaultAIProvider
+	if override := os.Getenv(EnvAIProvider); override != "" {
+		provider = strings.ToLower(strings.TrimSpace(override))
+	}
+
+	// Fail at startup rather than on the first dispute: an agent that polls
+	// happily for an hour and only then discovers it cannot reason is worse
+	// than one that refuses to start.
+	var anthropicKey, openAIKey string
+	switch provider {
+	case ProviderAnthropic:
+		anthropicKey = os.Getenv(EnvAnthropicAPIKey)
+		if anthropicKey == "" {
+			return Config{}, ErrMissingAnthropicAPIKey
+		}
+	case ProviderOpenAI:
+		openAIKey = os.Getenv(EnvOpenAIAPIKey)
+		if openAIKey == "" {
+			return Config{}, ErrMissingOpenAIAPIKey
+		}
+	default:
+		return Config{}, fmt.Errorf("%w: got %q", ErrUnknownAIProvider, provider)
 	}
 
 	rpcURL := DefaultRPCURL
@@ -79,7 +117,9 @@ func Load() (Config, error) {
 		RPCURL:          rpcURL,
 		EscrowAddress:   common.HexToAddress(escrowAddress),
 		PrivateKey:      privateKey,
-		AnthropicAPIKey: apiKey,
+		AIProvider:      provider,
+		AnthropicAPIKey: anthropicKey,
+		OpenAIAPIKey:    openAIKey,
 		ChainID:         ChainID,
 	}, nil
 }
