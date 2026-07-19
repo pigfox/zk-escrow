@@ -355,21 +355,26 @@ than implying otherwise.
 
 Live on **Base Sepolia, chain id 84532**, deployed 2026-07-19.
 
-| Contract | Address | |
-| --- | --- | --- |
-| **Proxy** ← interact with this | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84) | ERC-1967, initialized |
-| Implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4) | `EscrowUpgradeable` |
-| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56) | `Groth16Verifier` |
-| Owner | [`0x49FE3B2731090b93d297D259BD1eFFC5DB015edF`](https://sepolia.basescan.org/address/0x49FE3B2731090b93d297D259BD1eFFC5DB015edF) | upgrade authority |
+| Contract | Address | Source | |
+| --- | --- | --- | --- |
+| **Proxy** ← interact with this | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84#code) | ✅ verified | ERC-1967, initialized |
+| Implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4#code) | ✅ verified | `EscrowUpgradeable` |
+| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56#code) | ✅ verified | `Groth16Verifier` |
+| Owner | [`0x49FE3B2731090b93d297D259BD1eFFC5DB015edF`](https://sepolia.basescan.org/address/0x49FE3B2731090b93d297D259BD1eFFC5DB015edF) | — | upgrade authority |
 
 ```bash
 export ESCROW_ADDRESS=0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84
 ```
 
-**Source verification is pending.** The deploy ran without an
-`ETHERSCAN_API_KEY`, so `forge script` broadcast without `--verify` and all
-three contracts are currently unverified on BaseScan. To verify them, set the
-key in `../.env` and run:
+All three are verified on BaseScan against solc `v0.8.28+commit.7893614a` with
+the optimizer on at 200 runs — the same settings `foundry.toml` pins, so the
+published source matches what the tests and fuzzers ran against.
+
+<details>
+<summary>Reproducing the verification</summary>
+
+The deploy itself ran without an `ETHERSCAN_API_KEY`, so verification was done
+after the fact. With the key set in `../.env`:
 
 ```bash
 set -a; source ../.env; set +a
@@ -392,9 +397,19 @@ forge verify-contract 0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84 \
             0x49FE3B2731090b93d297D259BD1eFFC5DB015edF)")"
 ```
 
-Linking the proxy to its implementation so BaseScan renders the escrow's
-read/write tabs is a manual click in the BaseScan UI — *Contract → More Options
-→ Is this a proxy?* — and cannot be scripted.
+The proxy's constructor args encode the implementation address plus the
+`initialize(verifier, owner)` calldata; they match the arguments recorded in
+`broadcast/Deploy.s.sol/84532/run-latest.json` byte for byte.
+
+</details>
+
+> **One manual step remains.** BaseScan has the proxy's source but has not yet
+> been told it *is* a proxy, so it does not expose Read/Write-as-Proxy or link
+> through to the implementation's ABI. That detection is a UI action and cannot
+> be scripted: open the [proxy address](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84#code)
+> → **Contract** → **More Options** → **Is this a proxy?** → **Verify**. Until
+> then, interact via `cast` (every one-liner above works regardless) or through
+> the implementation's ABI.
 
 ### Deployment transactions
 
