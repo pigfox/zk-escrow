@@ -353,19 +353,61 @@ than implying otherwise.
 
 ## Deployed addresses (Base Sepolia)
 
-> **TODO — fill in after running `./scripts/deploy.sh`.**
->
-> ```
-> Network:        Base Sepolia (chain id 84532)
-> Proxy:          0x... ← the address to interact with
-> Implementation: 0x...
-> Verifier:       0x...
-> Owner:          0x...
-> BaseScan:       https://sepolia.basescan.org/address/0x...
-> ```
->
-> Then set `ESCROW_ADDRESS` in `../.env` so the demo scripts and the agent pick
-> it up.
+Live on **Base Sepolia, chain id 84532**, deployed 2026-07-19.
+
+| Contract | Address | |
+| --- | --- | --- |
+| **Proxy** ← interact with this | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84) | ERC-1967, initialized |
+| Implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4) | `EscrowUpgradeable` |
+| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56) | `Groth16Verifier` |
+| Owner | [`0x49FE3B2731090b93d297D259BD1eFFC5DB015edF`](https://sepolia.basescan.org/address/0x49FE3B2731090b93d297D259BD1eFFC5DB015edF) | upgrade authority |
+
+```bash
+export ESCROW_ADDRESS=0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84
+```
+
+**Source verification is pending.** The deploy ran without an
+`ETHERSCAN_API_KEY`, so `forge script` broadcast without `--verify` and all
+three contracts are currently unverified on BaseScan. To verify them, set the
+key in `../.env` and run:
+
+```bash
+set -a; source ../.env; set +a
+
+forge verify-contract 0xE6372Ff3083B9fea441204BF5617a5afF02e2D56 \
+    src/Verifier.sol:Groth16Verifier \
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
+
+forge verify-contract 0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4 \
+    src/EscrowUpgradeable.sol:EscrowUpgradeable \
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
+
+forge verify-contract 0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84 \
+    lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy \
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch \
+    --constructor-args "$(cast abi-encode 'constructor(address,bytes)' \
+        0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4 \
+        "$(cast calldata 'initialize(address,address)' \
+            0xE6372Ff3083B9fea441204BF5617a5afF02e2D56 \
+            0x49FE3B2731090b93d297D259BD1eFFC5DB015edF)")"
+```
+
+Linking the proxy to its implementation so BaseScan renders the escrow's
+read/write tabs is a manual click in the BaseScan UI — *Contract → More Options
+→ Is this a proxy?* — and cannot be scripted.
+
+### Deployment transactions
+
+| Contract | Tx |
+| --- | --- |
+| `Groth16Verifier` | [`0x1381d46a…`](https://sepolia.basescan.org/tx/0x1381d46ab23cab5d5bd45d89189987bd9c3194630bc983d91486e6c3f55ad015) |
+| `EscrowUpgradeable` | [`0xbc5456e6…`](https://sepolia.basescan.org/tx/0xbc5456e64bc7a6780b0abc57f185105a9c0a760a6b8ea4f6498b1880e684bc03) |
+| `ERC1967Proxy` | [`0xb4d8bcb6…`](https://sepolia.basescan.org/tx/0xb4d8bcb62bc1a6998d274a3816b28985ef75b6cb0d27fc9678635c02346169cd) |
+
+All three succeeded (receipt status `0x1`), for a total of 0.0000139929 ETH in
+gas. Post-deploy state was checked on chain: `verifier()` returns the deployed
+verifier, `owner()` returns the deployer, the ERC-1967 implementation slot holds
+the implementation address, and `initialize()` reverts on a second call.
 
 ---
 
