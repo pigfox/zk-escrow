@@ -16,6 +16,8 @@ balanceContract: 1000000000000000000000
 allContracts: false
 
 testLimit: 100000
+# seqLen intentionally matches foundry.toml's invariant depth (64), so all three
+# engines walk sequences of the same length.
 seqLen: 64
 shrinkLimit: 5000
 

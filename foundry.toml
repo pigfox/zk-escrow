@@ -30,15 +30,20 @@ runs = 512
 
 [profile.default.invariant]
 runs = 256
-depth = 32
-fail_on_revert = false
+# depth intentionally matches echidna.yaml's seqLen, so all three engines walk
+# sequences of the same length and a bug found by one is reachable by the rest.
+depth = 64
+# Every harness entry point swallows its expected reverts by design, so a revert
+# surfacing here is a harness bug — not a protocol finding — and must fail loud
+# rather than silently shrinking the effective search space.
+fail_on_revert = true
 
 [profile.ci.fuzz]
 runs = 1024
 
 [profile.ci.invariant]
 runs = 512
-depth = 48
+depth = 96
 
 [fmt]
 line_length = 110
