@@ -27,6 +27,32 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
+  fmt:
+    name: fmt (formatting gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+
+      # Pinned, NOT `stable`, and this is the whole point of a separate job.
+      # forge's formatter changes between releases: a tree formatted by 1.4.2
+      # does not satisfy `--check` under 1.7, so gating on a floating `stable`
+      # turns an unrelated upstream release into a red build on an unchanged
+      # tree. Every other job tracks stable deliberately; only this one must be
+      # reproducible. Bump this pin and re-run `forge fmt test/` together, never
+      # separately.
+      - uses: foundry-rs/foundry-toolchain@v1.3.1
+        with:
+          version: v1.4.2
+
+      # Scoped to test/ because that is the tree that is actually formatted.
+      # src/ and script/ still have pre-existing violations; widening this is a
+      # one-word change once they are cleaned up, and src/Verifier.sol is
+      # already excluded in foundry.toml's [fmt] ignore so widening cannot
+      # reformat generated output.
+      - name: Format check
+        run: forge fmt --check test/
+
+  # ---------------------------------------------------------------------------
   forge:
     name: forge (build, test, invariants, coverage gate)
     runs-on: ubuntu-24.04
@@ -38,14 +64,6 @@ jobs:
       - uses: foundry-rs/foundry-toolchain@v1.3.1
         with:
           version: stable
-
-      # Scoped to test/ because that is the tree that is actually formatted.
-      # src/ and script/ still have pre-existing violations; widening this to
-      # the whole repo is a one-word change once they are cleaned up, and
-      # src/Verifier.sol is already excluded in foundry.toml's [fmt] ignore so
-      # widening cannot reformat generated output.
-      - name: Format check
-        run: forge fmt --check test/
 
       - name: Build
         run: forge build --sizes
