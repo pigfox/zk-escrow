@@ -349,7 +349,7 @@ two real checked-in proofs that share a commitment and differ in nullifier.
 ## Testing
 
 ```bash
-forge test                  # 97 tests: unit, fuzz, invariants
+forge test                  # 103 tests: unit, fuzz, invariants
 ./scripts/coverage.sh       # coverage gate — fails below 100% on src/
 echidna . --contract Properties --config echidna.yaml
 medusa fuzz --config medusa.json
@@ -361,23 +361,78 @@ cd agent && go test ./... -race -coverprofile=coverage.out
 
 `test/Properties.sol` is the single source of truth for the invariants, consumed
 by **Foundry**, **Echidna** and **Medusa** alike, so a property cannot hold in
-one engine and silently rot in another:
+one engine and silently rot in another. Six properties:
 
 - **(a)** the contract's ETH balance always equals the sum of its obligations —
   amounts credited to payees *plus* amounts still locked against `Funded` or
   `Disputed` escrows. Both halves are recomputed independently of the contract's
   own bookkeeping, so a bug in `totalPendingWithdrawals` cannot hide behind
   itself.
-- **(b)** no transition ever credits or pays the arbiter.
+- **(b)** no settlement ever credits the arbiter *of the escrow it settles*.
+  This is a flow-level check, not an address-level one: each wrapper snapshots
+  that escrow's arbiter around the call and flags an increase. An address may
+  legitimately hold credits it earned as the buyer or seller of some *other*
+  escrow, which is exactly the state the rotating actor pool produces, so
+  "this address holds zero" would be the wrong question to ask.
 - **(c)** every escrow only ever moves along an edge of the declared state
   machine.
+- **(d)** obligations never exceed the total ever funded — nothing can be owed
+  that was never paid in.
+- **(e)** a nullifier settles at most one escrow, ever. Nullifiers are bounded
+  into a pool of eight so that collisions actually *occur* inside a fuzz
+  sequence; with a raw `uint256` the fuzzer never collided, so the replay guard
+  was never exercised and this property passed vacuously while looking green.
+- **(f)** the progress ledger is consistent: every ghost success counter is
+  dominated by an opportunity registered in the same call frame. Without this,
+  the canary below can silently start asserting luck instead of behaviour.
 
-The harness drives buyer, seller and arbiter as real `Actor` contracts rather
-than cheatcode pranks, because Echidna and Medusa have no `prank` — without
-that, the fuzzers would bounce off `resolveDispute`'s access-control guard
-forever and never reach `Resolved`. `test/PropertiesHarness.t.sol` exists to
-prove the harness is not vacuous: it walks every terminal state
-deterministically, so a green fuzz run means something.
+The harness drives every party as a real `Actor` contract rather than a
+cheatcode prank, because Echidna and Medusa have no `prank` — without that, the
+fuzzers would bounce off `resolveDispute`'s access-control guard forever and
+never reach `Resolved`. It rotates a pool of six actors, deriving three distinct
+roles per escrow from the fuzz input, so one address can be the seller of one
+escrow and the buyer or arbiter of another. A fixed party triple can never
+produce the case where an address is owed money from two escrows in two
+different capacities. `test/PropertiesHarness.t.sol` exists to prove the harness
+is not vacuous: it walks every terminal state deterministically, so a green fuzz
+run means something.
+
+### The harness audits itself
+
+A property suite that never reaches an interesting state reports green forever,
+which is indistinguishable from a correct protocol. So `afterInvariant` asserts
+the run was not inert — but as *implications*, not raw counts: each opportunity
+counter tallies only calls whose preconditions were all satisfied, and the
+assertion is that anything which should have succeeded did. Raw counts flake,
+because `afterInvariant` fires after every run of every invariant — roughly 1500
+samples per `forge test` — and a sequence that draws no `fund` selector in 64
+picks is unlucky, not broken. That canary then caught a real defect in itself:
+`fund` picked uniformly over every escrow ever created, so its hit rate decayed
+as a sequence ran and whole runs were starved of any funded escrow. `fund` now
+splits on its seed — three quarters scan forward for a `Created` escrow, one
+quarter keeps the uniform pick so the state guard still gets probed with
+wrong-state calls, which are counted separately rather than diluting the
+conversion rate the canary measures.
+
+### What CI enforces about the fuzzers
+
+Three guards, each closing a way a fuzz suite can fail by looking green.
+
+`fail_on_revert = true`. Every harness entry point swallows its expected
+reverts by design, so a revert reaching the engine is a harness bug rather than
+a protocol finding — and left unchecked it silently shrinks the search space.
+
+`EXPECTED_PROPERTIES`. Both fuzz jobs assert the run registered exactly that
+many properties. A predicate that stops being picked up — a rename, a bad
+build — otherwise reports as a smaller green run, not an error.
+
+A forced rebuild before each fuzzer. `forge coverage` overwrites `out/` with
+coverage-instrumented artifacts, and crytic-compile consumes those, or a stale
+`crytic-export/`, without complaint — registering a property set that does not
+match the source. That once cut the suite to four of five properties silently.
+Each fuzz job now deletes `crytic-export/` and runs `forge build --force`
+immediately beforehand, unconditionally, so a future job reorder cannot bring
+it back.
 
 ### Coverage
 
