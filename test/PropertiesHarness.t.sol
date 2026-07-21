@@ -325,11 +325,7 @@ contract PropertiesHarnessTest is Test {
 
     /// @dev Reads an escrow's real parties; the actor pool rotates, so no test
     ///      may hardcode who is who.
-    function _parties(uint256 id)
-        internal
-        view
-        returns (address buyer, address seller, address arbiter)
-    {
+    function _parties(uint256 id) internal view returns (address buyer, address seller, address arbiter) {
         EscrowUpgradeable.Escrow memory e = p.escrow().getEscrow(p.createdEscrows(id));
         return (e.buyer, e.seller, e.arbiter);
     }

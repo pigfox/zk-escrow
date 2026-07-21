@@ -50,3 +50,8 @@ line_length = 110
 tab_width = 4
 bracket_spacing = false
 int_types = "long"
+# Same reasoning as [lint] above, and not covered by it: that ignore applies to
+# the linter only. `int_types = "long"` would rewrite the generated verifier's
+# `uint[2] calldata` to `uint256[2] calldata` — a real token change to snarkjs
+# output that must stay byte-identical to what the circuit build produces.
+ignore = ["src/Verifier.sol"]

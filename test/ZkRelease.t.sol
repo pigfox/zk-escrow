@@ -41,8 +41,7 @@ contract ZkReleaseTest is Test {
         verifier = new Groth16Verifier();
 
         EscrowUpgradeable impl = new EscrowUpgradeable();
-        bytes memory initData =
-            abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), owner));
+        bytes memory initData = abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), owner));
         escrow = EscrowUpgradeable(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.deal(buyer, 100 ether);
@@ -63,14 +62,12 @@ contract ZkReleaseTest is Test {
     }
 
     function test_Verifier_AcceptsFixtureProof() public view {
-        uint256[3] memory pubSignals =
-            [fixture0.nullifier, fixture0.commitment, fixture0.escrowId];
+        uint256[3] memory pubSignals = [fixture0.nullifier, fixture0.commitment, fixture0.escrowId];
         assertTrue(verifier.verifyProof(fixture0.pA, fixture0.pB, fixture0.pC, pubSignals), "valid");
     }
 
     function test_Verifier_RejectsTamperedPublicSignals() public view {
-        uint256[3] memory tampered =
-            [fixture0.nullifier, fixture0.commitment + 1, fixture0.escrowId];
+        uint256[3] memory tampered = [fixture0.nullifier, fixture0.commitment + 1, fixture0.escrowId];
         assertFalse(verifier.verifyProof(fixture0.pA, fixture0.pB, fixture0.pC, tampered), "invalid");
     }
 
@@ -170,19 +167,15 @@ contract ZkReleaseTest is Test {
     ///      wrong proof.
     function test_Verifier_RejectsOffCurvePoint() public view {
         uint256[2] memory offCurveA = [uint256(1), uint256(3)];
-        uint256[3] memory pubSignals =
-            [fixture0.nullifier, fixture0.commitment, fixture0.escrowId];
-        assertFalse(
-            verifier.verifyProof(offCurveA, fixture0.pB, fixture0.pC, pubSignals), "rejected"
-        );
+        uint256[3] memory pubSignals = [fixture0.nullifier, fixture0.commitment, fixture0.escrowId];
+        assertFalse(verifier.verifyProof(offCurveA, fixture0.pB, fixture0.pC, pubSignals), "rejected");
     }
 
     function test_Verifier_RejectsZeroProof() public view {
         uint256[2] memory zeroA;
         uint256[2][2] memory zeroB;
         uint256[2] memory zeroC;
-        uint256[3] memory pubSignals =
-            [fixture0.nullifier, fixture0.commitment, fixture0.escrowId];
+        uint256[3] memory pubSignals = [fixture0.nullifier, fixture0.commitment, fixture0.escrowId];
         assertFalse(verifier.verifyProof(zeroA, zeroB, zeroC, pubSignals), "rejected");
     }
 
@@ -233,11 +226,7 @@ contract ZkReleaseTest is Test {
     }
 
     /// @dev Reads an array of 32-byte field elements.
-    function _words(string memory json, string memory path)
-        internal
-        pure
-        returns (uint256[] memory out)
-    {
+    function _words(string memory json, string memory path) internal pure returns (uint256[] memory out) {
         bytes32[] memory raw = abi.decode(vm.parseJson(json, path), (bytes32[]));
         out = new uint256[](raw.length);
         for (uint256 i = 0; i < raw.length; i++) {

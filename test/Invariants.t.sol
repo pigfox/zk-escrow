@@ -60,9 +60,7 @@ contract InvariantsTest is Test {
 
     /// @notice INVARIANT (b): no settlement ever credits its escrow's arbiter.
     function invariant_ArbiterNeverCredited() public view {
-        assertTrue(
-            properties.echidna_arbiter_never_credited(), "a settlement credited its own arbiter"
-        );
+        assertTrue(properties.echidna_arbiter_never_credited(), "a settlement credited its own arbiter");
     }
 
     /// @notice INVARIANT (c): the state machine is never violated.
@@ -72,18 +70,12 @@ contract InvariantsTest is Test {
 
     /// @notice Obligations can never exceed what was actually funded.
     function invariant_ObligationsNeverExceedFunded() public view {
-        assertTrue(
-            properties.echidna_obligations_never_exceed_funded(),
-            "obligations exceeded funded total"
-        );
+        assertTrue(properties.echidna_obligations_never_exceed_funded(), "obligations exceeded funded total");
     }
 
     /// @notice INVARIANT (d): a nullifier can settle at most one escrow.
     function invariant_NullifierNeverReused() public view {
-        assertTrue(
-            properties.echidna_nullifier_never_reused(),
-            "a nullifier settled more than one escrow"
-        );
+        assertTrue(properties.echidna_nullifier_never_reused(), "a nullifier settled more than one escrow");
     }
 
     /// @notice The progress ledger's success counts never outrun their
@@ -129,8 +121,7 @@ contract InvariantsTest is Test {
         }
         if (properties.ghost_settleOpportunities() > 0) {
             assertGt(
-                properties.ghost_releases() + properties.ghost_refunds()
-                    + properties.ghost_resolutions(),
+                properties.ghost_releases() + properties.ghost_refunds() + properties.ghost_resolutions(),
                 0,
                 "every settleable escrow failed to settle"
             );

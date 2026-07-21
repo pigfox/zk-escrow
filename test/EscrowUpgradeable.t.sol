@@ -3,8 +3,9 @@ pragma solidity 0.8.28;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {ReentrancyGuardUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {BaseTest} from "./Base.t.sol";
 import {EscrowUpgradeable} from "../src/EscrowUpgradeable.sol";
@@ -34,8 +35,7 @@ contract EscrowUpgradeableTest is BaseTest {
 
     function test_Initialize_RevertsOnZeroOwner() public {
         EscrowUpgradeable impl = new EscrowUpgradeable();
-        bytes memory initData =
-            abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), address(0)));
+        bytes memory initData = abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), address(0)));
         vm.expectRevert(EscrowUpgradeable.ZeroAddress.selector);
         new ERC1967Proxy(address(impl), initData);
     }
@@ -149,9 +149,7 @@ contract EscrowUpgradeableTest is BaseTest {
     function test_Fund_RevertsOnWrongAmount() public {
         uint256 escrowId = _create();
         vm.prank(buyer);
-        vm.expectRevert(
-            abi.encodeWithSelector(EscrowUpgradeable.IncorrectAmount.selector, AMOUNT, 0.5 ether)
-        );
+        vm.expectRevert(abi.encodeWithSelector(EscrowUpgradeable.IncorrectAmount.selector, AMOUNT, 0.5 ether));
         escrow.fund{value: 0.5 ether}(escrowId);
     }
 
@@ -229,9 +227,7 @@ contract EscrowUpgradeableTest is BaseTest {
         _release(first, NULLIFIER);
 
         uint256 second = _createAndFund();
-        vm.expectRevert(
-            abi.encodeWithSelector(EscrowUpgradeable.NullifierAlreadyUsed.selector, NULLIFIER)
-        );
+        vm.expectRevert(abi.encodeWithSelector(EscrowUpgradeable.NullifierAlreadyUsed.selector, NULLIFIER));
         _release(second, NULLIFIER);
     }
 
@@ -508,9 +504,7 @@ contract EscrowUpgradeableTest is BaseTest {
         escrow.raiseDispute(other, "evidence");
 
         vm.prank(otherArbiter);
-        vm.expectRevert(
-            abi.encodeWithSelector(EscrowUpgradeable.NotAuthorized.selector, otherArbiter)
-        );
+        vm.expectRevert(abi.encodeWithSelector(EscrowUpgradeable.NotAuthorized.selector, otherArbiter));
         escrow.resolveDispute(escrowId, EscrowUpgradeable.Ruling.SellerWins, "not my escrow");
     }
 
@@ -538,9 +532,7 @@ contract EscrowUpgradeableTest is BaseTest {
 
     function test_Withdraw_RevertsWithNothingPending() public {
         vm.prank(stranger);
-        vm.expectRevert(
-            abi.encodeWithSelector(EscrowUpgradeable.NothingToWithdraw.selector, stranger)
-        );
+        vm.expectRevert(abi.encodeWithSelector(EscrowUpgradeable.NothingToWithdraw.selector, stranger));
         escrow.withdraw();
     }
 
@@ -583,9 +575,7 @@ contract EscrowUpgradeableTest is BaseTest {
 
         receiver.setAcceptEth(false);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                EscrowUpgradeable.TransferFailed.selector, address(receiver), AMOUNT
-            )
+            abi.encodeWithSelector(EscrowUpgradeable.TransferFailed.selector, address(receiver), AMOUNT)
         );
         receiver.attack();
 
@@ -657,9 +647,7 @@ contract EscrowUpgradeableTest is BaseTest {
 
         uint256 escrowId = _create();
         vm.prank(buyer);
-        vm.expectRevert(
-            abi.encodeWithSelector(EscrowUpgradeable.IncorrectAmount.selector, AMOUNT, sent)
-        );
+        vm.expectRevert(abi.encodeWithSelector(EscrowUpgradeable.IncorrectAmount.selector, AMOUNT, sent));
         escrow.fund{value: sent}(escrowId);
     }
 
@@ -674,9 +662,7 @@ contract EscrowUpgradeableTest is BaseTest {
         assertEq(e.buyer, caller, "caller is buyer");
     }
 
-    function testFuzz_ResolveDispute_OnlyEverPaysBuyerOrSeller(uint8 rulingRaw, address caller)
-        public
-    {
+    function testFuzz_ResolveDispute_OnlyEverPaysBuyerOrSeller(uint8 rulingRaw, address caller) public {
         uint256 escrowId = _createFundAndDispute();
 
         EscrowUpgradeable.Ruling ruling = EscrowUpgradeable.Ruling(bound(rulingRaw, 0, 1));

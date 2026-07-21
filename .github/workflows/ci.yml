@@ -39,6 +39,14 @@ jobs:
         with:
           version: stable
 
+      # Scoped to test/ because that is the tree that is actually formatted.
+      # src/ and script/ still have pre-existing violations; widening this to
+      # the whole repo is a one-word change once they are cleaned up, and
+      # src/Verifier.sol is already excluded in foundry.toml's [fmt] ignore so
+      # widening cannot reformat generated output.
+      - name: Format check
+        run: forge fmt --check test/
+
       - name: Build
         run: forge build --sizes
 

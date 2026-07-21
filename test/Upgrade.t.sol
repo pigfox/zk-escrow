@@ -11,8 +11,7 @@ import {EscrowV2} from "./mocks/EscrowV2.sol";
 /// @notice Exercises `_authorizeUpgrade` and proves state survives the swap.
 contract UpgradeTest is BaseTest {
     /// @dev ERC-1967 implementation slot.
-    bytes32 internal constant IMPL_SLOT =
-        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+    bytes32 internal constant IMPL_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     function test_Upgrade_ByOwnerSucceeds() public {
         EscrowV2 v2 = new EscrowV2();
@@ -73,9 +72,7 @@ contract UpgradeTest is BaseTest {
         EscrowV2 v2 = new EscrowV2();
 
         vm.prank(buyer);
-        vm.expectRevert(
-            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, buyer)
-        );
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, buyer));
         escrow.upgradeToAndCall(address(v2), "");
 
         vm.prank(arbiter);
@@ -120,9 +117,7 @@ contract UpgradeTest is BaseTest {
         EscrowV2 v2 = new EscrowV2();
 
         vm.prank(owner);
-        vm.expectRevert(
-            abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, owner)
-        );
+        vm.expectRevert(abi.encodeWithSelector(OwnableUpgradeable.OwnableUnauthorizedAccount.selector, owner));
         escrow.upgradeToAndCall(address(v2), "");
 
         vm.prank(newOwner);

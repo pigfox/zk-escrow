@@ -147,9 +147,7 @@ contract Properties {
         // Echidna/Medusa endow this contract at deploy time; Foundry's setUp
         // deals it explicitly. Either way, split the stake across the pool so
         // every actor can afford to be a buyer.
-        uint256 stake = address(this).balance < POOL_ENDOWMENT
-            ? address(this).balance
-            : POOL_ENDOWMENT;
+        uint256 stake = address(this).balance < POOL_ENDOWMENT ? address(this).balance : POOL_ENDOWMENT;
         uint256 share = stake / POOL_SIZE;
 
         for (uint256 i = 0; i < POOL_SIZE; i++) {
@@ -249,7 +247,8 @@ contract Properties {
         ghost_createAttempts += 1;
 
         uint256 expectedId = escrow.nextEscrowId();
-        (bool ok,) = actorPool[b].exec(
+        (bool ok,) = actorPool[b]
+        .exec(
             address(escrow),
             0,
             abi.encodeCall(
@@ -307,8 +306,7 @@ contract Properties {
             ghost_fundWrongStateAttempts += 1;
         }
 
-        (bool ok,) =
-            actorOf(b).exec(address(escrow), amount, abi.encodeCall(EscrowUpgradeable.fund, (id)));
+        (bool ok,) = actorOf(b).exec(address(escrow), amount, abi.encodeCall(EscrowUpgradeable.fund, (id)));
         if (ok) {
             if (ghost_fundOpportunities == oppBefore) ledgerInconsistent = true;
             totalFunded += amount;
@@ -340,8 +338,8 @@ contract Properties {
         // before the call, so the snapshot the opportunity is registered from
         // is the one the call executes against.
         if (
-            escrow.getState(id) == EscrowUpgradeable.State.Funded
-                && !escrow.nullifierUsed(nullifier) && verifier.shouldVerify()
+            escrow.getState(id) == EscrowUpgradeable.State.Funded && !escrow.nullifierUsed(nullifier)
+                && verifier.shouldVerify()
         ) {
             ghost_settleOpportunities += 1;
         }
@@ -384,8 +382,7 @@ contract Properties {
 
         uint256 arbiterBefore = escrow.pendingWithdrawals(arb);
 
-        (bool ok,) =
-            actorOf(s).exec(address(escrow), 0, abi.encodeCall(EscrowUpgradeable.refund, (id)));
+        (bool ok,) = actorOf(s).exec(address(escrow), 0, abi.encodeCall(EscrowUpgradeable.refund, (id)));
 
         if (ok) {
             if (ghost_settleOpportunities == oppBefore) ledgerInconsistent = true;
@@ -406,11 +403,8 @@ contract Properties {
         address who = asSeller ? s : b;
         if (!isPoolActor[who]) return;
 
-        (bool ok,) = actorOf(who).exec(
-            address(escrow),
-            0,
-            abi.encodeCall(EscrowUpgradeable.raiseDispute, (id, "fuzz evidence"))
-        );
+        (bool ok,) = actorOf(who)
+            .exec(address(escrow), 0, abi.encodeCall(EscrowUpgradeable.raiseDispute, (id, "fuzz evidence")));
         if (ok) _observe(id);
     }
 
@@ -425,11 +419,8 @@ contract Properties {
         address who = asSeller ? s : b;
         if (!isPoolActor[who]) return;
 
-        (bool ok,) = actorOf(who).exec(
-            address(escrow),
-            0,
-            abi.encodeCall(EscrowUpgradeable.submitEvidence, (id, "fuzz evidence"))
-        );
+        (bool ok,) = actorOf(who)
+            .exec(address(escrow), 0, abi.encodeCall(EscrowUpgradeable.submitEvidence, (id, "fuzz evidence")));
         if (ok) _observe(id);
     }
 
@@ -456,11 +447,12 @@ contract Properties {
 
         uint256 arbiterBefore = escrow.pendingWithdrawals(arb);
 
-        (bool ok,) = actorOf(arb).exec(
-            address(escrow),
-            0,
-            abi.encodeCall(EscrowUpgradeable.resolveDispute, (id, ruling, "fuzz rationale"))
-        );
+        (bool ok,) = actorOf(arb)
+            .exec(
+                address(escrow),
+                0,
+                abi.encodeCall(EscrowUpgradeable.resolveDispute, (id, ruling, "fuzz rationale"))
+            );
 
         if (ok) {
             if (ghost_settleOpportunities == oppBefore) ledgerInconsistent = true;
@@ -482,11 +474,12 @@ contract Properties {
         EscrowUpgradeable.Ruling ruling =
             sellerWins ? EscrowUpgradeable.Ruling.SellerWins : EscrowUpgradeable.Ruling.BuyerWins;
 
-        (bool ok,) = actorOf(b).exec(
-            address(escrow),
-            0,
-            abi.encodeCall(EscrowUpgradeable.resolveDispute, (id, ruling, "unauthorized"))
-        );
+        (bool ok,) = actorOf(b)
+            .exec(
+                address(escrow),
+                0,
+                abi.encodeCall(EscrowUpgradeable.resolveDispute, (id, ruling, "unauthorized"))
+            );
 
         // The buyer is never its own escrow's arbiter, so success here is a
         // broken guard.

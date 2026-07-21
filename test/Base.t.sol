@@ -34,8 +34,7 @@ abstract contract BaseTest is Test {
         verifier = new MockVerifier();
 
         EscrowUpgradeable impl = new EscrowUpgradeable();
-        bytes memory initData =
-            abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), owner));
+        bytes memory initData = abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), owner));
         escrow = EscrowUpgradeable(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.deal(buyer, 100 ether);
