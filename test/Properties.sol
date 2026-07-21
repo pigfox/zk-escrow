@@ -99,10 +99,14 @@ contract Properties {
     ///      A run is only required to make progress if the random walk actually
     ///      handed it the chance. Drawing zero `fund` calls in 64 selections has
     ///      probability (15/18)^64, about 6e-6 — negligible per run, but
-    ///      `afterInvariant` fires after all 256 runs of each of the five
-    ///      invariants, so across ~1280 samples it shows up roughly once every
+    ///      `afterInvariant` fires after all 256 runs of each of the six
+    ///      invariants, so across ~1500 samples it shows up roughly once every
     ///      ten `forge test` invocations. Asserting bare success counts
     ///      therefore fails on unlucky-but-correct sequences.
+    ///
+    ///      `echidna_ledger_consistent` guards the pairing itself: a success
+    ///      that advances without registering makes the two sides count
+    ///      different populations, and the implications silently weaken.
     ///
     ///      These count only calls that had every precondition satisfied and so
     ///      MUST have succeeded. Comparing them against the success counts asks
@@ -111,6 +115,23 @@ contract Properties {
     uint256 public ghost_createAttempts;
     uint256 public ghost_fundOpportunities;
     uint256 public ghost_settleOpportunities;
+
+    /// @dev How often `fund` deliberately aimed at an escrow that was not in
+    ///      `Created`. Not an opportunity — an adversarial probe at the state
+    ///      guard. Tracked for observability only; nothing asserts it is
+    ///      non-zero, because whether the state mix ever offers one depends on
+    ///      the walk, and asserting on it would put luck back into the suite.
+    uint256 public ghost_fundWrongStateAttempts;
+
+    /// @notice Sticky flag: set if a success counter ever advances in a call
+    ///         frame that did not first register its paired opportunity.
+    /// @dev The opportunity counters are only meaningful as a denominator if
+    ///      every success is dominated by one. When a success path can advance
+    ///      without registering, the ledger drifts and the `afterInvariant`
+    ///      implications quietly weaken — the failure is silent, and shows up
+    ///      only as a count exceeding its own opportunity total in a report.
+    ///      Checking it here turns that drift into a failing property instead.
+    bool public ledgerInconsistent;
 
     /// @dev Starting balance split across the actor pool.
     uint256 internal constant POOL_ENDOWMENT = 1000 ether;
@@ -224,6 +245,7 @@ contract Properties {
 
         // Three distinct pool actors and a non-zero amount: nothing here can
         // legitimately be rejected, so this attempt must turn into a create.
+        uint256 oppBefore = ghost_createAttempts;
         ghost_createAttempts += 1;
 
         uint256 expectedId = escrow.nextEscrowId();
@@ -237,6 +259,7 @@ contract Properties {
         );
 
         if (ok) {
+            if (ghost_createAttempts == oppBefore) ledgerInconsistent = true;
             createdEscrows.push(expectedId);
             ghost_creates += 1;
             _observe(expectedId);
@@ -244,23 +267,50 @@ contract Properties {
     }
 
     /// @notice Funds a previously created escrow from that escrow's buyer.
+    /// @dev The seed picks the strategy as well as the escrow. Three quarters
+    ///      of the time it scans forward for a `Created` escrow, because
+    ///      funding is the single gateway to every interesting state and a
+    ///      uniform pick gets steadily worse at finding the fundable ones as a
+    ///      sequence goes on — which starved whole runs of any funded escrow.
+    ///      The remaining quarter picks uniformly and aims at whatever comes
+    ///      back, so `fund`'s own state guard keeps getting probed rather than
+    ///      being designed out of reach by the fix for the starvation.
     function fund(uint256 seed) public {
-        (bool exists, uint256 id) = _pickInState(seed, EscrowUpgradeable.State.Created);
+        uint256 oppBefore = ghost_fundOpportunities;
+
+        bool exists;
+        uint256 id;
+        if (seed % 4 != 0) {
+            (exists, id) = _pickInState(seed, EscrowUpgradeable.State.Created);
+        } else {
+            (exists, id) = _pick(seed);
+        }
         if (!exists) return;
 
         (bool known, address b,,) = _partiesOf(id);
         if (!known || !isPoolActor[b]) return;
 
+        // Deliberately NOT pre-guarded on state: letting a wrong-state call
+        // through to the escrow is the whole point of the uniform branch.
         uint256 amount = _amountOf(id);
         if (amount == 0 || b.balance < amount) return;
 
-        // A `Created` escrow, funded by its own buyer, for exactly the recorded
-        // amount, with the balance to cover it. This one has to go through.
-        ghost_fundOpportunities += 1;
+        if (escrow.getState(id) == EscrowUpgradeable.State.Created) {
+            // A `Created` escrow, funded by its own buyer, for exactly the
+            // recorded amount, with the balance to cover it. This one has to
+            // go through — every on-chain precondition is satisfied, checked
+            // against the same state the call below will execute against.
+            ghost_fundOpportunities += 1;
+        } else {
+            // An adversarial probe, not a missed opportunity. Counting it as
+            // one would dilute the conversion rate the canary asserts on.
+            ghost_fundWrongStateAttempts += 1;
+        }
 
         (bool ok,) =
             actorOf(b).exec(address(escrow), amount, abi.encodeCall(EscrowUpgradeable.fund, (id)));
         if (ok) {
+            if (ghost_fundOpportunities == oppBefore) ledgerInconsistent = true;
             totalFunded += amount;
             ghost_funds += 1;
             _observe(id);
@@ -274,6 +324,8 @@ contract Properties {
     ///      single fuzz sequence — with a raw uint256 the replay guard was
     ///      unreachable, and an always-passing property proves nothing.
     function release(uint256 seed, uint256 nullifier) public {
+        uint256 oppBefore = ghost_settleOpportunities;
+
         (bool exists, uint256 id) = _pick(seed);
         if (!exists) return;
 
@@ -282,6 +334,18 @@ contract Properties {
         (bool known,,, address arb) = _partiesOf(id);
         if (!known) return;
 
+        // `release` is permissionless, so the only things standing between
+        // this call and a settlement are the state, the replay guard and the
+        // verifier's current verdict. All three are read here, immediately
+        // before the call, so the snapshot the opportunity is registered from
+        // is the one the call executes against.
+        if (
+            escrow.getState(id) == EscrowUpgradeable.State.Funded
+                && !escrow.nullifierUsed(nullifier) && verifier.shouldVerify()
+        ) {
+            ghost_settleOpportunities += 1;
+        }
+
         uint256 arbiterBefore = escrow.pendingWithdrawals(arb);
 
         uint256[2] memory a;
@@ -289,6 +353,7 @@ contract Properties {
         uint256[2] memory c;
 
         try escrow.release(id, nullifier, a, b, c) {
+            if (ghost_settleOpportunities == oppBefore) ledgerInconsistent = true;
             nullifierReleaseCount[nullifier] += 1;
             if (nullifierReleaseCount[nullifier] > 1) nullifierReuseSeen = true;
             if (escrow.pendingWithdrawals(arb) > arbiterBefore) fundsLeftTheParties = true;
@@ -304,6 +369,8 @@ contract Properties {
 
     /// @notice Refunds an escrow from that escrow's seller.
     function refund(uint256 seed) public {
+        uint256 oppBefore = ghost_settleOpportunities;
+
         (bool exists, uint256 id) = _pick(seed);
         if (!exists) return;
 
@@ -321,6 +388,7 @@ contract Properties {
             actorOf(s).exec(address(escrow), 0, abi.encodeCall(EscrowUpgradeable.refund, (id)));
 
         if (ok) {
+            if (ghost_settleOpportunities == oppBefore) ledgerInconsistent = true;
             if (escrow.pendingWithdrawals(arb) > arbiterBefore) fundsLeftTheParties = true;
             ghost_refunds += 1;
             _observe(id);
@@ -369,6 +437,8 @@ contract Properties {
     /// @dev This is the call that could conceivably misroute funds, so it runs
     ///      with real authority rather than being blocked by access control.
     function resolveDispute(uint256 seed, bool sellerWins) public {
+        uint256 oppBefore = ghost_settleOpportunities;
+
         (bool exists, uint256 id) = _pick(seed);
         if (!exists) return;
 
@@ -393,6 +463,7 @@ contract Properties {
         );
 
         if (ok) {
+            if (ghost_settleOpportunities == oppBefore) ledgerInconsistent = true;
             if (escrow.pendingWithdrawals(arb) > arbiterBefore) fundsLeftTheParties = true;
             ghost_resolutions += 1;
             _observe(id);
@@ -485,6 +556,18 @@ contract Properties {
     /// @notice INVARIANT (d): a nullifier can settle at most one escrow, ever.
     function echidna_nullifier_never_reused() public view returns (bool) {
         return !nullifierReuseSeen;
+    }
+
+    /// @notice Every success the harness counts registered an opportunity first.
+    /// @dev A property about the harness, not the protocol. The progress canary
+    ///      asserts success-given-opportunity; if a success path can advance its
+    ///      count without registering, the two sides measure different
+    ///      populations and a count can exceed its own denominator. That drift
+    ///      is invisible in a green run — it surfaces only if someone reads the
+    ///      counters and notices the arithmetic does not work. This makes it a
+    ///      red test the moment it reappears.
+    function echidna_ledger_consistent() public view returns (bool) {
+        return !ledgerInconsistent;
     }
 
     /*//////////////////////////////////////////////////////////////

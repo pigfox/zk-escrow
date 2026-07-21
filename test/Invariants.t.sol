@@ -86,6 +86,18 @@ contract InvariantsTest is Test {
         );
     }
 
+    /// @notice The progress ledger's success counts never outrun their
+    ///         opportunity counts.
+    /// @dev Guards the canary itself: `afterInvariant` below only means
+    ///      anything while every success is dominated by a registered
+    ///      opportunity in the same call frame.
+    function invariant_LedgerConsistent() public view {
+        assertTrue(
+            properties.echidna_ledger_consistent(),
+            "a success counter advanced without registering an opportunity"
+        );
+    }
+
     /// @notice Proves the run was not inert.
     /// @dev Not an assertion about the protocol — an assertion about the test.
     ///      A property suite that never reaches an interesting state reports
@@ -96,8 +108,8 @@ contract InvariantsTest is Test {
     ///
     ///      Each check is an IMPLICATION, not a bare count. Foundry runs
     ///      `afterInvariant` after EVERY run, so anything asserted here has to
-    ///      hold across all 256 runs of each of the five invariants — roughly
-    ///      1280 samples per `forge test`. A bare `ghost_funds > 0` does not:
+    ///      hold across all 256 runs of each of the six invariants — roughly
+    ///      1500 samples per `forge test`. A bare `ghost_funds > 0` does not:
     ///      a walk that happens to draw zero `fund` selectors in 64 picks has
     ///      probability ~6e-6, which over 1280 samples surfaces about once
     ///      every ten invocations. That is an unlucky sequence, not a broken

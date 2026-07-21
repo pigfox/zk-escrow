@@ -4,6 +4,10 @@
 #
 # Properties.sol is deliberately the SAME contract Medusa and Foundry drive, so
 # a property can never hold in one engine and silently rot in another.
+#
+# WARNING: artifacts must come from a fresh `forge build`. `forge coverage`
+# overwrites out/ with instrumented artifacts that crytic-compile consumes
+# without complaint, silently registering fewer properties than the source has.
 
 # Assert against the boolean echidna_* predicates rather than Solidity asserts.
 testMode: property

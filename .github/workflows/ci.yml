@@ -18,6 +18,12 @@ concurrency:
 
 env:
   FOUNDRY_PROFILE: ci
+  # How many echidna_* predicates the harness exposes. Both fuzzers assert they
+  # registered exactly this many, so a property that silently stops being picked
+  # up — a rename, a stale artifact, a bad build — fails the job instead of
+  # reporting a smaller green run.
+  # bump when adding an echidna_* predicate.
+  EXPECTED_PROPERTIES: 6
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -133,14 +139,36 @@ jobs:
 
       # Echidna consumes the artifacts forge produces (--foundry-ignore-compile
       # in echidna.yaml), so crytic-compile never needs to fetch its own solc.
-      - name: Build artifacts for crytic-compile
-        run: forge build
+      #
+      # The rebuild is FORCED and crytic-export is deleted, unconditionally and
+      # immediately before the fuzz step. `forge coverage` overwrites out/ with
+      # coverage-instrumented artifacts, and crytic-compile will happily consume
+      # those — or a stale crytic-export/ — and register a property set that
+      # does not match the source. That silently shrank the suite to 4 of 5
+      # properties once already. This job does not currently run coverage, but
+      # the guard is here so a future reorder cannot bring the bug back.
+      - name: Build artifacts for crytic-compile (forced, no stale exports)
+        run: |
+          set -euo pipefail
+          rm -rf crytic-export
+          forge build --force
 
       - name: Fuzz
         # Target the project directory, not the single file: crytic-compile
         # treats a lone .sol path as a standalone solc target and tries to
         # download a matching compiler.
-        run: echidna . --contract Properties --config echidna.yaml
+        run: |
+          set -euo pipefail
+          echidna . --contract Properties --config echidna.yaml | tee echidna-output.txt
+          found="$(grep -cE '^echidna_[a-z_]+: (passing|passed)' echidna-output.txt || true)"
+          echo "echidna registered $found properties"
+          if [ "$found" != "$EXPECTED_PROPERTIES" ]; then
+            echo "::error::echidna registered $found properties, expected $EXPECTED_PROPERTIES"
+            echo "A property stopped being picked up — check for a rename, a"
+            echo "stale artifact, or a testPrefixes mismatch. If a predicate was"
+            echo "added or removed on purpose, bump EXPECTED_PROPERTIES."
+            exit 1
+          fi
 
   # ---------------------------------------------------------------------------
   medusa:
@@ -173,12 +201,31 @@ jobs:
           go install github.com/crytic/medusa@v1.5.1
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Build artifacts for crytic-compile
-        run: forge build
+      # Forced, and crytic-export deleted — same reasoning as the echidna job:
+      # crytic-compile will consume coverage-instrumented or stale artifacts
+      # without complaint and register a property set that does not match the
+      # source, which reads as a smaller green run rather than a failure.
+      - name: Build artifacts for crytic-compile (forced, no stale exports)
+        run: |
+          set -euo pipefail
+          rm -rf crytic-export
+          forge build --force
 
       - name: Fuzz
         # Medusa exits non-zero when a property fails, which fails the job.
-        run: medusa fuzz --config medusa.json
+        run: |
+          set -euo pipefail
+          medusa fuzz --config medusa.json 2>&1 | tee medusa-output.txt
+          passed="$(sed -r 's/\x1b\[[0-9;]*m//g' medusa-output.txt \
+            | grep -cE '\[PASSED\] Property Test:' || true)"
+          echo "medusa passed $passed properties"
+          if [ "$passed" != "$EXPECTED_PROPERTIES" ]; then
+            echo "::error::medusa passed $passed properties, expected $EXPECTED_PROPERTIES"
+            echo "A property stopped being picked up — check for a rename, a"
+            echo "stale artifact, or a testPrefixes mismatch. If a predicate was"
+            echo "added or removed on purpose, bump EXPECTED_PROPERTIES."
+            exit 1
+          fi
 
   # ---------------------------------------------------------------------------
   slither:

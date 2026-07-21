@@ -206,6 +206,98 @@ contract PropertiesHarnessTest is Test {
         _assertAllProperties();
     }
 
+    /// @notice `fund`'s uniform branch still probes the state guard.
+    /// @dev The starvation fix made `fund` scan forward for a `Created` escrow,
+    ///      which is good for reaching interesting states and bad for ever
+    ///      testing what happens when `fund` is aimed somewhere it should be
+    ///      refused: the scan can no longer produce that call. A quarter of
+    ///      seeds keep the old uniform pick for exactly this reason, and the
+    ///      resulting wrong-state attempt is counted separately so it cannot be
+    ///      mistaken for a missed funding opportunity.
+    function test_Harness_UniformFundOnTerminalEscrowIsRejected() public {
+        p.createEscrow(1 ether, C);
+        // Seed 1 takes the scan branch (1 % 4 != 0) and funds the escrow.
+        p.fund(1);
+        p.release(0, 0);
+        assertTrue(_state(0) == EscrowUpgradeable.State.Released, "released");
+
+        uint256 wrongBefore = p.ghost_fundWrongStateAttempts();
+        uint256 fundsBefore = p.ghost_funds();
+        uint256 oppsBefore = p.ghost_fundOpportunities();
+
+        // Seed 0 takes the uniform branch, which aims at whatever `_pick`
+        // returns — here the only escrow there is, now terminal.
+        p.fund(0);
+
+        assertTrue(_state(0) == EscrowUpgradeable.State.Released, "state guard held");
+        assertEq(p.ghost_fundWrongStateAttempts(), wrongBefore + 1, "probe was counted");
+        assertEq(p.ghost_funds(), fundsBefore, "nothing was funded");
+        assertEq(p.ghost_fundOpportunities(), oppsBefore, "a probe is not a funding opportunity");
+        _assertAllProperties();
+    }
+
+    /// @notice Every settlement path registers an opportunity before it counts.
+    /// @dev `release` used to increment its success count without registering
+    ///      one, so a run could report more settlements than settlement
+    ///      opportunities. Each leg is driven here and the ledger checked
+    ///      directly, because the sticky flag can only catch the drift on paths
+    ///      a given run happens to walk.
+    function test_Harness_EverySettlementRegistersAnOpportunity() public {
+        // Release.
+        p.createEscrow(1 ether, C);
+        p.fund(1);
+        uint256 opps = p.ghost_fundOpportunities();
+        assertEq(opps, 1, "funding registered");
+
+        uint256 settleBefore = p.ghost_settleOpportunities();
+        p.release(0, 0);
+        assertEq(p.ghost_releases(), 1, "released");
+        assertEq(p.ghost_settleOpportunities(), settleBefore + 1, "release registered");
+
+        // Refund.
+        p.createEscrow(2 ether, uint256(keccak256("c2")));
+        p.fund(1);
+        settleBefore = p.ghost_settleOpportunities();
+        p.refund(1);
+        assertEq(p.ghost_refunds(), 1, "refunded");
+        assertEq(p.ghost_settleOpportunities(), settleBefore + 1, "refund registered");
+
+        // Resolution.
+        p.createEscrow(3 ether, uint256(keccak256("c3")));
+        p.fund(2);
+        p.raiseDispute(2, false);
+        settleBefore = p.ghost_settleOpportunities();
+        p.resolveDispute(2, true);
+        assertEq(p.ghost_resolutions(), 1, "resolved");
+        assertEq(p.ghost_settleOpportunities(), settleBefore + 1, "resolution registered");
+
+        // The whole point: settlements never outrun their opportunities.
+        assertLe(
+            p.ghost_releases() + p.ghost_refunds() + p.ghost_resolutions(),
+            p.ghost_settleOpportunities(),
+            "settlements <= settlement opportunities"
+        );
+        _assertAllProperties();
+    }
+
+    /// @notice A release rejected by the verifier is not an opportunity.
+    /// @dev The verdict gates whether `release` can succeed at all, so it has
+    ///      to be part of the precondition the opportunity is registered on.
+    ///      Reading state without it would count every failed-proof attempt as
+    ///      a settlement that should have happened.
+    function test_Harness_FailedProofIsNotASettlementOpportunity() public {
+        p.createEscrow(1 ether, C);
+        p.fund(1);
+        p.setVerifierVerdict(false);
+
+        uint256 settleBefore = p.ghost_settleOpportunities();
+        p.release(0, 0);
+
+        assertTrue(_state(0) == EscrowUpgradeable.State.Funded, "unchanged on bad proof");
+        assertEq(p.ghost_settleOpportunities(), settleBefore, "no opportunity registered");
+        _assertAllProperties();
+    }
+
     /// @dev Entry points must be safe to call before any escrow exists.
     function test_Harness_NoOpsWhenNoEscrows() public {
         p.fund(0);
@@ -248,5 +340,6 @@ contract PropertiesHarnessTest is Test {
         assertTrue(p.echidna_state_machine_valid(), "state machine valid");
         assertTrue(p.echidna_obligations_never_exceed_funded(), "obligations <= funded");
         assertTrue(p.echidna_nullifier_never_reused(), "nullifier never reused");
+        assertTrue(p.echidna_ledger_consistent(), "progress ledger consistent");
     }
 }

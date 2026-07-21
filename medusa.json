@@ -1,4 +1,5 @@
 {
+  "//": "WARNING: artifacts must come from a fresh `forge build`. `forge coverage` overwrites out/ with instrumented artifacts that crytic-compile consumes without complaint, silently registering fewer properties than the source has.",
   "fuzzing": {
     "workers": 8,
     "workerResetLimit": 50,
