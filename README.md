@@ -76,12 +76,17 @@ before any real transaction was broadcast.
 | Upgrade (`upgradeToAndCall`) | [`0x875a9d68…`](https://sepolia.basescan.org/tx/0x875a9d68b8249575a4ef61de6e1fc457db758ca2182b18604b977db2488c7e63) |
 | New arbiter | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` |
 | Nine rotations | escrows 5, 6, 8, 10, 14, 15, 16, 20, 22 — hashes in [`deployments/base-sepolia.json`](deployments/base-sepolia.json) |
+| Nine settlements | escrows 5, 6, 8, 10, 14, 15, 16, 20, 22 — all `BuyerWins`, tx hashes in [`docs/settlements-2026-07.md`](docs/settlements-2026-07.md) |
 
-With the arbiter now keyed and funded, the nine are **settle-able**: the AI agent
-scans their `DisputeRaised` evidence, rules, and calls `resolveDispute` as the fresh
-arbiter. Running it needs an `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY` with
-`AI_PROVIDER=openai`) and a `START_BLOCK_LOOKBACK` deep enough to reach the oldest
-dispute — see [Agent configuration](#agent-configuration).
+With the arbiter keyed and funded, the **nine stranded disputes were settled by the
+AI arbiter, all rulings on-chain** — the agent scanned each `DisputeRaised` evidence
+trail, ruled, and called `resolveDispute` as the fresh arbiter, writing both the
+ruling and its full reasoning to chain; every escrow was read back to `Resolved`. The
+rulings, rationales, and transaction hashes are tabulated in
+[`docs/settlements-2026-07.md`](docs/settlements-2026-07.md). To reproduce a run the
+agent needs an `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY` with `AI_PROVIDER=openai`) and
+a `START_BLOCK_LOOKBACK` deep enough to reach the oldest dispute — see
+[Agent configuration](#agent-configuration).
 
 ---
 
