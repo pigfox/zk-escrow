@@ -145,8 +145,10 @@ const (
 	// OpenAIBaseURL is the Chat Completions endpoint.
 	OpenAIBaseURL = "https://api.openai.com/v1/chat/completions"
 	// OpenAIModel is the model the arbiter reasons with when the OpenAI
-	// provider is selected.
-	OpenAIModel = "gpt-5.4-nano"
+	// provider is selected. The FULL gpt-5.4 (not the nano tier): an on-chain
+	// ruling is consequential work, matching the house convention for the
+	// blog autopilot's OpenAIBlogModel.
+	OpenAIModel = "gpt-5.4"
 	// OpenAIMaxTokens bounds the model's reply.
 	OpenAIMaxTokens = 1024
 	// OpenAITimeout bounds a single API round trip.

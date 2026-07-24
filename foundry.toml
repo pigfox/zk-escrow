@@ -20,6 +20,13 @@ remappings = [
 # Tests read the checked-in fixture proofs; nothing else touches the filesystem.
 fs_permissions = [{access = "read", path = "./test/fixtures"}]
 
+# Named endpoint for the V2 upgrade fork rehearsal (test/ForkRotation.t.sol),
+# which forks live Base Sepolia state via vm.createSelectFork("base_sepolia").
+# The default suite does not fork; the fork test is @fork-tagged and only runs on
+# demand (forge test --match-contract ForkRotation), so CI needs no RPC access.
+[rpc_endpoints]
+base_sepolia = "https://sepolia.base.org"
+
 [lint]
 # Verifier.sol is generated verbatim by snarkjs. Its naming and layout are not
 # ours to change, and regenerating would just reintroduce any edits.

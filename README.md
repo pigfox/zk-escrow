@@ -27,10 +27,12 @@ winner but can never pay itself.
 | Contract | Address |
 | --- | --- |
 | **Proxy** ← interact with this | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84#code) |
-| Implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4#code) |
+| Implementation — V2 (current) | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637`](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637#code) |
+| Implementation — V1 (original) | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4#code) |
 | Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56#code) |
 
-All three verified on BaseScan. Chain id 84532.
+All verified on BaseScan. Chain id 84532. The proxy was upgraded V1 → V2 to add
+the arbiter-rotation recovery — see [Recovery](#recovery-the-v2-arbiter-rotation).
 
 Four escrows have run to completion: **#0 and #1 released by zero-knowledge
 proof**, **#2 and #3 settled by the AI arbiter**. Across all four the arbiter
@@ -38,6 +40,53 @@ routed 0.003 ETH between buyers and sellers and took **nothing** — its
 `pendingWithdrawals` balance is `0`, and the contract's ETH balance equals
 `totalPendingWithdrawals` to the wei. Invariants (a) and (b) below are not just
 fuzzer output; they held against real traffic.
+
+---
+
+## Recovery: the V2 arbiter rotation
+
+A later audit of the live deployment found **nine escrows stranded in `Disputed`**
+(#5, #6, #8, #10, #14, #15, #16, #20, #22). Every one named the same arbiter — an
+address that, by an earlier design choice, was **address-only: no private key
+existed for it anywhere.** A keyless arbiter can never call `resolveDispute`, so
+those nine could never be settled. The funds were never at risk (they can only ever
+reach the buyer or seller), but they were frozen.
+
+The fix used the one authority that was still keyed — the `owner` (the UUPS upgrade
+authority) — without touching the escrow logic or the funds:
+
+1. **A fresh keyed arbiter** was generated locally and funded with gas dust.
+2. **`EscrowUpgradeableV2`** was deployed and the proxy upgraded to it
+   (`upgradeToAndCall`). V2's only addition is one owner-only function,
+   `setArbiter(escrowId, newArbiter)`, guarded to a `Disputed` escrow and a new
+   arbiter distinct from the two parties (it emits `ArbiterRotated`). The storage
+   layout is byte-identical to V1 — the upgrade is a pure function + event append.
+3. **All nine arbiters were rotated** to the fresh keyed address, each read back on
+   chain to confirm.
+
+The upgrade was rehearsed against **live forked state first**
+(`test/ForkRotation.t.sol`, gated behind `FORK_REHEARSAL=true`): deploy V2 →
+upgrade → `setArbiter` → `resolveDispute` as the new arbiter, asserting funds route
+to the ruled side, the state reaches `Resolved`, and the arbiter is never credited —
+before any real transaction was broadcast.
+
+| Step | Address / tx |
+| --- | --- |
+| V2 implementation | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637`](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637#code) |
+| Upgrade (`upgradeToAndCall`) | [`0x875a9d68…`](https://sepolia.basescan.org/tx/0x875a9d68b8249575a4ef61de6e1fc457db758ca2182b18604b977db2488c7e63) |
+| New arbiter | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` |
+| Nine rotations | escrows 5, 6, 8, 10, 14, 15, 16, 20, 22 — hashes in [`deployments/base-sepolia.json`](deployments/base-sepolia.json) |
+| Nine settlements | escrows 5, 6, 8, 10, 14, 15, 16, 20, 22 — all `BuyerWins`, tx hashes in [`docs/settlements-2026-07.md`](docs/settlements-2026-07.md) |
+
+With the arbiter keyed and funded, the **nine stranded disputes were settled by the
+AI arbiter, all rulings on-chain** — the agent scanned each `DisputeRaised` evidence
+trail, ruled, and called `resolveDispute` as the fresh arbiter, writing both the
+ruling and its full reasoning to chain; every escrow was read back to `Resolved`. The
+rulings, rationales, and transaction hashes are tabulated in
+[`docs/settlements-2026-07.md`](docs/settlements-2026-07.md). To reproduce a run the
+agent needs an `ANTHROPIC_API_KEY` (or `OPENAI_API_KEY` with `AI_PROVIDER=openai`) and
+a `START_BLOCK_LOOKBACK` deep enough to reach the oldest dispute — see
+[Agent configuration](#agent-configuration).
 
 ---
 
@@ -533,6 +582,24 @@ other party in that trade*. It cannot drain the contract, cannot touch escrows
 where it is not the arbiter, cannot upgrade anything (that is `owner`, a
 separate role — `test_ResolveDispute_RevertsForOwnerWhoIsNotArbiter` pins the
 separation), and cannot pay itself. Fund it with dust; treat the key as public.
+
+**The owner can rotate a disputed escrow's arbiter (V2).** `setArbiter`, added in
+`EscrowUpgradeableV2`, lets `owner` reassign the arbiter of a `Disputed` escrow.
+It is a governance power, and an honest one to name — but a strictly *smaller* one
+than the owner already held: the owner has UUPS upgrade authority, so it could
+swap the entire implementation to do anything regardless; a scoped `setArbiter` is
+an auditable slice of that same power. It exists as a recovery tool, and was used
+for exactly that (see [Recovery](#recovery-the-v2-arbiter-rotation)): the original
+run assigned several disputes a keyless arbiter address that could never settle
+them, and rotation to a keyed arbiter is the fix. The fund-safety invariant is
+preserved — `setArbiter` rejects a new arbiter equal to the buyer or seller, so a
+rotated arbiter still cannot be the beneficiary of its own ruling, exactly as
+`createEscrow` guarantees. It is `Disputed`-only (never a mid-trade party swap),
+touches no balance, and emits `ArbiterRotated`. Its full branch set is unit-tested
+and two invariants are fuzzed: a rotation never moves funds, and only the owner can
+ever rotate. What it does *not* defend against is a malicious owner rotating to an
+arbiter it controls and then ruling — but that owner could already upgrade the
+contract to drain everything, so `setArbiter` grants no power it lacked.
 
 **What is genuinely trusted:** that Claude's ruling is a fair reading of the
 evidence, and that the evidence on chain is the real evidence. Neither is
