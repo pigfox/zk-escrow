@@ -1,0 +1,18 @@
+{
+  "chainId": 84532,
+  "network": "base-sepolia",
+  "explorer": "https://sepolia.basescan.org",
+  "proxy": "0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84",
+  "implementations": {
+    "v1": "0x5c3f41dce28afa54f9656377afbf360cc9310fb4",
+    "v2": "0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637"
+  },
+  "owner": "0x49FE3B2731090b93d297D259BD1eFFC5DB015edF",
+  "arbiter": "0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C",
+  "note": "V2 (setArbiter recovery) upgraded the UUPS proxy; the nine keyless-arbiter disputes were rotated to the fresh keyed arbiter and settled by the AI agent. Private keys are laptop-only and never recorded here.",
+  "upgradeTx": "0x875a9d68b8249575a4ef61de6e1fc457db758ca2182b18604b977db2488c7e63",
+  "arbiterRotations": {
+    "5": "0xca2740f61accb052d97bfde8bc2210a1ba094b42e66a7e23e30862cbac59f466", "6": "0x3fc9444f2d0ffa23e65f41c48f5bbced184336b9e7f5093ad8de57e8b69a1ca0", "8": "0x4aeca8ae3d7067e5fd429793aca4a5faec3c72c6e8ba155bcc3ec2e7b446fb9f", "10": "0x6f128f8898e3e7c5071e1bc9c063232ebd1bec8ec40a521e5068d02e8aeb204c", "14": "0xe3a219a1a334e67ad9960304d1f618e7a519fb4d5f4a69779e5edb3f675211d7",
+    "15": "0x53a45b2ac0322104f728df6fdc93d4a9fcc8f63569e35b6d96c5a232b5189e88", "16": "0xe584f54f92a0cb0daf0e361bd4931e4e5480fc4ea8b861e5e9b4a4f693dad9ba", "20": "0x6576d695e2a5ec0b0cb7b7bc879cfe222e884d13ce553494126866d3b780a0c4", "22": "0x322311348e838b6859636d4803c6df5911794fd6ccc0ed1599814d1e89aacf60"
+  }
+}

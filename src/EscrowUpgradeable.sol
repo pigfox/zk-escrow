@@ -151,7 +151,12 @@ contract EscrowUpgradeable is
     uint256 public nextEscrowId;
 
     /// @notice All escrows by id.
-    mapping(uint256 escrowId => Escrow escrow) private _escrows;
+    /// @dev `internal` (not `private`) so the V2 recovery implementation can add
+    ///      an owner-only `setArbiter` by inheritance without duplicating or
+    ///      reordering storage. Visibility only — same slot, same behaviour, and
+    ///      the external API is unchanged (reads still go through getEscrow /
+    ///      getState). See EscrowUpgradeableV2.
+    mapping(uint256 escrowId => Escrow escrow) internal _escrows;
 
     /// @notice Pull-payment balances. The sum of these always equals the
     ///         contract's ETH balance.
