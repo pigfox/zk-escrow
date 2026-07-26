@@ -14,7 +14,8 @@ seller releases the funds by proving, in zero knowledge, that they know a
 delivery secret — the money moves on a Groth16 proof, not on anyone's say-so,
 and the secret never touches the chain. When delivery is contested there is no
 proof to be had, so the escrow falls to an arbiter, and the arbiter here is a Go
-agent that reads both parties' evidence, asks Claude for a ruling, and executes
+agent that reads both parties' evidence, asks a frontier model for a ruling
+(Claude or GPT, whichever `AI_PROVIDER` names), and executes
 it on chain with `cast`. The contract is deliberately built so that the AI
 cannot be trusted with more than it needs: `resolveDispute` takes a *side*, not
 a destination, so a compromised or hallucinating arbiter can pick the wrong
@@ -31,9 +32,16 @@ winner but can never pay itself.
 | Verifier | [`0x20B98B460c1252974177215EaDa7A61259Ad5825`](https://sepolia.basescan.org/address/0x20B98B460c1252974177215EaDa7A61259Ad5825#code) |
 | Owner | `0xb6c3a56CA2f99e3F5d7d16ad968df9f71cCC184D` |
 
-All verified on BaseScan. Chain id 84532. Deployed **2026-07-26**, fresh — the
-contract has no escrow history yet, and its live counters read from chain, so the
-demo shows real zeroes until traffic arrives.
+All verified on BaseScan. Chain id 84532. Deployed **2026-07-26**, fresh, then
+seeded with the two acts this repo exists to demonstrate:
+
+| Escrow | Act | Outcome |
+| --- | --- | --- |
+| #0 | `scripts/demo-happy-path.sh` | `Released` — settled by a real Groth16 proof of the delivery secret; the seller pulled the payment. |
+| #1 | `scripts/demo-dispute.sh` + the agent | `Resolved` — contested delivery, settled by the AI arbiter, ruling `SellerWins` and the full rationale written on chain ([tx](https://sepolia.basescan.org/tx/0xb6b43f7e587f9aba983190b9553017df6fb2d2d958c71d39690b12ab118345e9)). |
+
+Everything past #1 is visitor traffic. The site's counters are live chain reads,
+so they show whatever is actually there.
 
 > **Everything below this line describes the v1 deployment**, which is retired but
 > still on chain: the four completed escrows, the nine stranded disputes, the UUPS
@@ -78,8 +86,9 @@ The upgrade was rehearsed before any real transaction was broadcast: deploy V2 �
 upgrade → `setArbiter` → `resolveDispute` as the new arbiter, asserting funds route
 to the ruled side, the state reaches `Resolved`, and the arbiter is never credited.
 
-That rehearsal originally ran against live *forked* state. It no longer forks
-anything — forking is now banned outright in this repo — and ships as two pieces:
+That rehearsal originally ran against a local *copy* of live chain state. It no
+longer does — pointing the EVM at a copied chain is now banned outright in this
+repo — and ships as two pieces:
 
 - **`test/RecoveryDrill.t.sol`** — the same sequence in pure EVM, built from
   scratch with no RPC access. Runs on every `forge test`, including in CI, and
@@ -257,12 +266,12 @@ against escrow #1 — it is unprovable there.
 ```bash
 ./scripts/demo-dispute.sh
 # then, in another shell:
-cd agent && go run .
+./scripts/run-arbiter.sh
 ```
 
 `create → fund → dispute → counter-evidence → agent rules → settle`. The agent
-polls for `DisputeRaised`, gathers every submission for the escrow, asks Claude
-for a ruling as strict JSON, prints the exact `cast send` it is about to run
+polls for `DisputeRaised`, gathers every submission for the escrow, asks the
+configured model for a ruling as strict JSON, prints the exact `cast send` it is about to run
 (with the key redacted), and executes it. The full rationale is emitted on chain
 in the `DisputeResolved` event.
 
@@ -277,7 +286,14 @@ Read from the environment only — `source ../.env` before running.
 | `OPENAI_API_KEY` | — | Required when `AI_PROVIDER=openai`. |
 | `START_BLOCK_LOOKBACK` | `5000` | Cold-start scan depth, in blocks. |
 | `ESCROW_ADDRESS` | — | The deployed proxy. |
-| `PRIVATE_KEY` | — | The arbiter's signing key. Never logged. |
+| `PRIVATE_KEY` | — | The ARBITER's signing key — never the deployer's. Never logged. |
+
+The last two are the agent's own generic names, which predate the unified
+`DEMO_*` roles. `scripts/run-arbiter.sh` is the one place that mapping lives
+(`DEMO_ARBITER_PK` → `PRIVATE_KEY`, `DEMO_ESCROW_ADDRESS` → `ESCROW_ADDRESS`), so
+no operator has to remember which key `PRIVATE_KEY` means here. It also honours
+`ARBITER_RPC_URL`, because the agent needs a node at the head of the chain that
+will serve `eth_getLogs` over the lookback window — not every free endpoint does.
 
 The backend is pluggable because the prompt and the `{ruling, rationale}`
 contract are identical either way — only the request envelope differs, so a
@@ -301,8 +317,16 @@ Set up first:
 
 ```bash
 set -a; source ../.env; set +a
-export ESCROW=0x...            # the proxy address
-export RPC=https://sepolia.base.org
+export ESCROW="$DEMO_ESCROW_ADDRESS"
+export RPC="${DEMO_RPC_URL:-https://sepolia.base.org}"
+
+# The three parties. They MUST be three distinct addresses — createEscrow
+# reverts with DuplicateParty otherwise.
+export BUYER_KEY="$DEMO_INVESTOR_A_PK"
+export SELLER_KEY="$DEMO_INVESTOR_B_PK"
+export ARBITER_KEY="$DEMO_ARBITER_PK"
+export SELLER="$DEMO_INVESTOR_B_ADDR"
+export ARBITER="$DEMO_ARBITER_ADDR"
 ```
 
 ```bash
@@ -312,17 +336,17 @@ node scripts/poseidon.js 12345 0
 # Create an escrow (caller becomes the buyer; the three parties must differ)
 cast send $ESCROW "createEscrow(address,address,uint256,uint256)" \
     $SELLER $ARBITER 1000000000000000 $COMMITMENT \
-    --rpc-url $RPC --chain-id 84532 --private-key $PRIVATE_KEY
+    --rpc-url $RPC --chain-id 84532 --private-key $BUYER_KEY
 
 # Fund it (buyer only, exact amount)
 cast send $ESCROW "fund(uint256)" 0 --value 1000000000000000 \
-    --rpc-url $RPC --chain-id 84532 --private-key $PRIVATE_KEY
+    --rpc-url $RPC --chain-id 84532 --private-key $BUYER_KEY
 
 # Generate a proof, then release with it (anyone may send this)
 ./scripts/prove.sh 12345 0
 cast send $ESCROW "release(uint256,uint256,uint256[2],uint256[2][2],uint256[2])" \
     0 $NULLIFIER $PA $PB $PC \
-    --rpc-url $RPC --chain-id 84532 --private-key $PRIVATE_KEY
+    --rpc-url $RPC --chain-id 84532 --private-key $BUYER_KEY
 
 # Seller returns the money without a dispute
 cast send $ESCROW "refund(uint256)" 0 \
@@ -330,22 +354,23 @@ cast send $ESCROW "refund(uint256)" 0 \
 
 # Escalate, and add evidence afterwards
 cast send $ESCROW "raiseDispute(uint256,string)" 0 "nothing arrived" \
-    --rpc-url $RPC --chain-id 84532 --private-key $PRIVATE_KEY
+    --rpc-url $RPC --chain-id 84532 --private-key $BUYER_KEY
 cast send $ESCROW "submitEvidence(uint256,string)" 0 "signed POD attached" \
     --rpc-url $RPC --chain-id 84532 --private-key $SELLER_KEY
 
-# Arbiter rules. 0 = BuyerWins, 1 = SellerWins
+# Arbiter rules. 0 = BuyerWins, 1 = SellerWins.
+# ONLY the escrow's named arbiter may send this — no other key can.
 cast send $ESCROW "resolveDispute(uint256,uint8,string)" 0 1 "tracking confirms delivery" \
-    --rpc-url $RPC --chain-id 84532 --private-key $PRIVATE_KEY
+    --rpc-url $RPC --chain-id 84532 --private-key $ARBITER_KEY
 
-# Pull your money out
+# Pull your money out (whichever side the settlement credited)
 cast send $ESCROW "withdraw()" \
-    --rpc-url $RPC --chain-id 84532 --private-key $PRIVATE_KEY
+    --rpc-url $RPC --chain-id 84532 --private-key $SELLER_KEY
 
 # Reads
 cast call $ESCROW "getState(uint256)(uint8)" 0 --rpc-url $RPC
 # 0 None · 1 Created · 2 Funded · 3 Released · 4 Refunded · 5 Disputed · 6 Resolved
-cast call $ESCROW "pendingWithdrawals(address)(uint256)" $ADDRESS --rpc-url $RPC
+cast call $ESCROW "pendingWithdrawals(address)(uint256)" $SELLER --rpc-url $RPC
 cast call $ESCROW "nullifierUsed(uint256)(bool)" $NULLIFIER --rpc-url $RPC
 cast logs --address $ESCROW \
     "DisputeResolved(uint256,address,uint8,address,uint256,string)" --rpc-url $RPC
@@ -655,11 +680,11 @@ than implying otherwise.
 ## Deployment reference
 
 The three addresses are at the [top of this README](#live-on-base-sepolia).
-Deployed 2026-07-19 to chain id 84532; the upgrade authority is
-[`0x49FE3B27…`](https://sepolia.basescan.org/address/0x49FE3B2731090b93d297D259BD1eFFC5DB015edF).
+Deployed 2026-07-26 to chain id 84532; the upgrade authority is
+[`0xb6c3a56C…`](https://sepolia.basescan.org/address/0xb6c3a56CA2f99e3F5d7d16ad968df9f71cCC184D).
 
 ```bash
-export ESCROW_ADDRESS=0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84
+export DEMO_ESCROW_ADDRESS=0x4421E53D0dd051159d1a0F03d45554313e3e9774
 ```
 
 All three are verified on BaseScan against solc `v0.8.28+commit.7893614a` with
@@ -730,19 +755,23 @@ needed only to deploy and to run the agent.
 
 ```bash
 cp .env.example ../.env
-$EDITOR ../.env          # ADDRESS, PRIVATE_KEY, ANTHROPIC_API_KEY
+$EDITOR ../.env          # the DEMO_* role keys, ANTHROPIC_API_KEY or OPENAI_API_KEY
 set -a; source ../.env; set +a
 ```
 
 | Variable | Needed for |
 | --- | --- |
-| `ADDRESS` | deploy, demos |
-| `PRIVATE_KEY` | deploy, demos, agent |
+| `DEMO_DEPLOYER_PK` / `_ADDR` | deploy |
+| `DEMO_OPERATOR_PK` | demos — the treasury that tops the other roles up |
+| `DEMO_INVESTOR_A_PK` | demos — the escrow's buyer |
+| `DEMO_INVESTOR_B_PK` | demos — the escrow's seller |
+| `DEMO_ARBITER_PK` / `_ADDR` | the agent — the only key that may settle a dispute |
 | `ANTHROPIC_API_KEY` | agent only, when `AI_PROVIDER` is `anthropic` (the default) |
 | `OPENAI_API_KEY` | agent only, when `AI_PROVIDER=openai` |
 | `AI_PROVIDER` | optional — `anthropic` (default) or `openai` |
 | `START_BLOCK_LOOKBACK` | optional — cold-start scan depth in blocks (default 5000, ~3h) |
-| `ESCROW_ADDRESS` | demos, agent (after deploy) |
+| `DEMO_ESCROW_ADDRESS` | demos, agent (after deploy) |
+| `DEMO_RPC_URL` | optional — where our clients talk, if not `sepolia.base.org` |
 | `ETHERSCAN_API_KEY` | optional — BaseScan verification |
 
 Then:

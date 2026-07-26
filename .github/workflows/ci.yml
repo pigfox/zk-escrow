@@ -27,6 +27,24 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
+  # Enforces the DIRECT-CHAIN DOCTRINE mechanically: nothing in this repo may
+  # point the EVM at a copy of a remote chain's state. The gate self-tests by
+  # planting a token, so a scan that has silently stopped matching fails the job
+  # instead of reporting the same green as a clean tree.
+  #
+  # fetch-depth: 0 is required — the gate uses `git grep` over tracked files.
+  no-chain-copy:
+    name: no-chain-copy (doctrine gate)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Chain-copy token gate (scan + self-test)
+        run: ./scripts/no-chain-copy-gate.sh
+
+  # ---------------------------------------------------------------------------
   fmt:
     name: fmt (formatting gate)
     runs-on: ubuntu-24.04

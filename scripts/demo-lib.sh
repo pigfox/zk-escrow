@@ -49,62 +49,41 @@ run() {
 }
 
 # ---------------------------------------------------------------------------
-# Throwaway demo identities
+# Demo identities — the unified DEMO_* roles
 # ---------------------------------------------------------------------------
 #
-# The escrow needs three distinct addresses, but the operator only has one key.
-# The demos therefore need throwaway seller/buyer identities.
+# The escrow needs three distinct addresses (createEscrow reverts with
+# DuplicateParty otherwise), and the estate provides exactly three standing
+# ones: Investor A buys, Investor B sells, and the arbiter settles. They are
+# the same roles every other demo in the estate uses, so an address seen here
+# is the address seen there — and they are long-lived, so their leftover gas
+# dust accumulates instead of being stranded one throwaway at a time.
 #
-# These MUST NOT be the well-known Anvil/Hardhat test keys. Those are published
-# in every Foundry install, and on a public testnet they are actively swept:
-# fund one and the ETH is gone before the next block. Base Sepolia's Anvil #4
-# even carries an EIP-7702 delegation to a sweeper contract, so a transfer to
-# it is forwarded on immediately and the account is left at zero — which shows
-# up later as a baffling "gas required exceeds allowance (0)".
-#
-# So: generate real random keys on first run, and cache them in a gitignored,
-# 0600 file so repeat runs reuse the same addresses and their leftover gas dust
-# accumulates instead of being stranded one address at a time.
-DEMO_KEYS_FILE="${DEMO_KEYS_FILE:-.demo-keys.env}"
+# Earlier revisions generated random per-run identities into a gitignored
+# .demo-keys.env. That file is obsolete: the roles below replace it.
+load_demo_roles() {
+    [ -n "${DEMO_INVESTOR_A_PK:-}" ] || die "DEMO_INVESTOR_A_PK is empty in ../.env"
+    [ -n "${DEMO_INVESTOR_B_PK:-}" ] || die "DEMO_INVESTOR_B_PK is empty in ../.env"
+    [ -n "${DEMO_ARBITER_ADDR:-}" ] || die "DEMO_ARBITER_ADDR is empty in ../.env"
 
-ensure_demo_keys() {
-    if [ -f "$DEMO_KEYS_FILE" ]; then
-        # shellcheck disable=SC1090
-        . "$DEMO_KEYS_FILE"
-    fi
+    redact_register "$DEMO_INVESTOR_A_PK" "$DEMO_INVESTOR_B_PK"
 
-    local created=0
-    local name
-    for name in DEMO_SELLER_KEY DEMO_BUYER_KEY; do
-        if [ -z "${!name:-}" ]; then
-            local generated
-            generated="$(cast wallet new 2>/dev/null \
-                | sed -n 's/^Private key: *\(0x[0-9a-fA-F]\{64\}\)$/\1/p')"
-            [ -n "$generated" ] || die "could not generate a throwaway key with 'cast wallet new'"
-            printf '%s=%s\n' "$name" "$generated" >> "$DEMO_KEYS_FILE"
-            export "$name=$generated"
-            created=1
-        fi
-    done
+    # Derive rather than trust the *_ADDR values: a key/address pair that has
+    # drifted would otherwise fail three steps later as an opaque revert.
+    BUYER_ADDR="$(cast wallet address --private-key "$DEMO_INVESTOR_A_PK")"
+    SELLER_ADDR="$(cast wallet address --private-key "$DEMO_INVESTOR_B_PK")"
+    BUYER_KEY="$DEMO_INVESTOR_A_PK"
+    SELLER_KEY="$DEMO_INVESTOR_B_PK"
+    ARBITER_ADDR="$DEMO_ARBITER_ADDR"
 
-    chmod 600 "$DEMO_KEYS_FILE"
-
-    DEMO_SELLER_ADDR="$(cast wallet address --private-key "$DEMO_SELLER_KEY")"
-    DEMO_BUYER_ADDR="$(cast wallet address --private-key "$DEMO_BUYER_KEY")"
-
-    redact_register "$DEMO_SELLER_KEY" "$DEMO_BUYER_KEY"
-
-    if [ "$created" = "1" ]; then
-        log "Generated throwaway demo identities -> $DEMO_KEYS_FILE (gitignored, 0600)"
-        echo "  These are freshly random, NOT the published Anvil keys, so testnet"
-        echo "  sweeper bots cannot drain them. Reused on subsequent runs."
-    fi
-    echo "  demo seller: $DEMO_SELLER_ADDR"
-    echo "  demo buyer : $DEMO_BUYER_ADDR"
+    echo "  buyer   (Investor A): $BUYER_ADDR"
+    echo "  seller  (Investor B): $SELLER_ADDR"
+    echo "  arbiter             : $ARBITER_ADDR"
 }
 
-# Tops a throwaway address up to `need` wei, skipping the transfer when it is
-# already funded — so repeat runs do not spray dust.
+# Tops a role address up to `need` wei, skipping the transfer when it is
+# already funded — so repeat runs do not spray dust. The treasury role
+# (DEMO_OPERATOR) pays, because it is the one holding the consolidated float.
 #
 # Verifies the balance AFTER transferring rather than trusting the receipt: a
 # swept or delegating recipient can accept a transfer and still end at zero,
@@ -124,13 +103,13 @@ fund_to() {
     log "Funding $label with $(cast from-wei "$top_up") ETH"
     run cast send "$addr" --value "$top_up" \
         --rpc-url "$RPC_URL" --chain-id "$BASE_SEPOLIA_CHAIN_ID" \
-        --private-key "$PRIVATE_KEY" > /dev/null
+        --private-key "$DEMO_OPERATOR_PK" > /dev/null
 
     have="$(cast balance "$addr" --rpc-url "$RPC_URL")"
     if [ "$(echo "$have >= $need" | bc)" = "1" ]; then
         echo "  $label now holds $(cast from-wei "$have") ETH"
     else
-        die "$label is at $(cast from-wei "$have") ETH after funding — expected at least $(cast from-wei "$need"). The address may be swept or delegating; delete $DEMO_KEYS_FILE to regenerate identities."
+        die "$label is at $(cast from-wei "$have") ETH after funding — expected at least $(cast from-wei "$need"). The address may be swept or delegating."
     fi
 }
 
@@ -147,11 +126,13 @@ demo_preflight() {
     # shellcheck disable=SC1090
     set -a; . "$env_file"; set +a
 
-    [ -n "${ADDRESS:-}" ] || die "ADDRESS is empty in $env_file"
-    [ -n "${PRIVATE_KEY:-}" ] || die "PRIVATE_KEY is empty in $env_file"
-    redact_register "$PRIVATE_KEY"
+    [ -n "${DEMO_OPERATOR_PK:-}" ] || die "DEMO_OPERATOR_PK is empty in $env_file"
+    redact_register "$DEMO_OPERATOR_PK"
 
-    RPC_URL="${RPC_URL:-$DEFAULT_RPC_URL}"
+    # DEMO_RPC_URL is where OUR clients talk. It is deliberately not the
+    # endpoint the site advertises to a wallet: sepolia.base.org throttles an
+    # operator box that has been running the chain suites all day.
+    RPC_URL="${DEMO_RPC_URL:-${RPC_URL:-$DEFAULT_RPC_URL}}"
 
     local actual
     actual="$(cast chain-id --rpc-url "$RPC_URL")" || die "cannot reach $RPC_URL"

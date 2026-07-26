@@ -25,28 +25,22 @@ PARTY_GAS_WEI="${PARTY_GAS_WEI:-400000000000000}"
 
 demo_preflight
 
-ESCROW="${1:-${ESCROW_ADDRESS:-}}"
-[ -n "$ESCROW" ] || die "no escrow address. Pass one, or set ESCROW_ADDRESS in ../.env. Deploy with ./scripts/deploy.sh"
+ESCROW="${1:-${DEMO_ESCROW_ADDRESS:-}}"
+[ -n "$ESCROW" ] || die "no escrow address. Pass one, or set DEMO_ESCROW_ADDRESS in ../.env. Deploy with ./scripts/deploy.sh"
 
-log "Throwaway identities"
-ensure_demo_keys
+log "Demo identities"
+load_demo_roles
 
-# The operator's key acts purely as the ARBITER here — that is the key the
-# agent signs with. Buyer and seller are both throwaways, so all three parties
-# are distinct as the contract requires.
-BUYER_ADDR="$DEMO_BUYER_ADDR"
-BUYER_KEY="$DEMO_BUYER_KEY"
-SELLER_ADDR="$DEMO_SELLER_ADDR"
-SELLER_KEY="$DEMO_SELLER_KEY"
-ARBITER_ADDR="$ADDRESS"
+# The arbiter role is the key the agent signs with. Buyer, seller and arbiter
+# are three distinct standing addresses, as the contract requires.
 
 cat <<BANNER
 
   zk-escrow — ACT II: the AI dispute path
   ---------------------------------------
   escrow contract : $ESCROW
-  buyer           : $BUYER_ADDR   (throwaway)
-  seller          : $SELLER_ADDR   (throwaway)
+  buyer           : $BUYER_ADDR
+  seller          : $SELLER_ADDR
   arbiter         : $ARBITER_ADDR   (the agent signs as this)
   amount          : $AMOUNT_WEI wei
 

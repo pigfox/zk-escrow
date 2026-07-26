@@ -17,16 +17,20 @@ contract lives in the `pigfox2` repo at `/demos/zk-escrow`.
   mismatches `.session-tag` it exits 1 — re-request, don't force.
 - `.session-tag` is gitignored: it is working-copy state, never committed.
 
-## NO-FORK DOCTRINE (absolute)
-- Nothing in this repo may fork a chain. No `vm.createFork` / `createSelectFork` /
-  `selectFork` / `rollFork`, no `--fork-url`, no `anvil`, no `[rpc_endpoints]` block in
-  `foundry.toml`, no local node. Tests are either pure-EVM unit/invariant tests or they
-  run directly against Base Sepolia (84532).
+## DIRECT-CHAIN DOCTRINE (absolute)
+- Every test, script and CI job either runs in a pure in-process EVM it builds itself,
+  or talks to Base Sepolia (84532) directly. Nothing may point the EVM at a copy,
+  snapshot or mirror of a remote chain's state: not the `vm.create*` / `vm.select*` /
+  `vm.roll*` chain-copy cheatcode family, not forge's chain-copy URL flag, not `anvil`,
+  not an `[rpc_endpoints]` block in `foundry.toml`, not a local node.
+- Enforced MECHANICALLY, not by good intentions: `scripts/no-chain-copy-gate.sh` runs in
+  CI, greps every tracked file for the banned tokens, and self-tests by planting one and
+  refusing to pass unless it is caught. Doctrine that only lives in prose is not enforced.
 - The recovery rehearsal is `RecoveryDrill`, gated on `RECOVERY_DRILL=true`. It deploys its
   OWN throwaway proxy and escrow on Base Sepolia and drills upgrade → arbiter rotation →
   dispute resolution against that. It must NEVER touch the live demo proxy.
-- The token `rehears*` is unrelated to forking (it names a Stripe money-path spec in
-  `pigfox2`). Never key a change on it.
+- The token `rehears*` is unrelated (it names a Stripe money-path spec in `pigfox2`, and
+  the drill above is a rehearsal that copies nothing). Never key a change on it.
 
 ## Secrets
 - Private keys are write-only at the terminal: never in command output, ledger rows, git,

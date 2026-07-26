@@ -166,7 +166,7 @@ func TestDefaultNewTicker(t *testing.T) {
 	ticker.Stop()
 }
 
-// TestNewModelClientSelectsTheProvider covers the wiring fork: the selected
+// TestNewModelClientSelectsTheProvider covers the wiring branch: the selected
 // provider must produce that vendor's client, and the banner must name the
 // model actually in use rather than a hardcoded one.
 //

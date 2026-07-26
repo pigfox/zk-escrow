@@ -12,7 +12,7 @@
 # the walkthrough doubles as copy-pasteable documentation.
 #
 # Usage: ./scripts/demo-happy-path.sh [escrowAddress]
-#   escrowAddress defaults to $ESCROW_ADDRESS from ../.env
+#   escrowAddress defaults to $DEMO_ESCROW_ADDRESS from ../.env
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -29,25 +29,21 @@ SELLER_GAS_WEI="${SELLER_GAS_WEI:-300000000000000}" # enough for one withdraw
 
 demo_preflight
 
-ESCROW="${1:-${ESCROW_ADDRESS:-}}"
-[ -n "$ESCROW" ] || die "no escrow address. Pass one, or set ESCROW_ADDRESS in ../.env. Deploy with ./scripts/deploy.sh"
+ESCROW="${1:-${DEMO_ESCROW_ADDRESS:-}}"
+[ -n "$ESCROW" ] || die "no escrow address. Pass one, or set DEMO_ESCROW_ADDRESS in ../.env. Deploy with ./scripts/deploy.sh"
 
-log "Throwaway identities"
-ensure_demo_keys
+log "Demo identities"
+load_demo_roles
 
-# The buyer is the operator; the seller is a throwaway. The arbiter is never
-# used in this act, but the contract requires three distinct addresses, so the
-# throwaway buyer identity stands in as a placeholder arbiter.
-SELLER_ADDR="$DEMO_SELLER_ADDR"
-SELLER_KEY="$DEMO_SELLER_KEY"
-ARBITER_ADDR="$DEMO_BUYER_ADDR"
+# The arbiter is named but never used in this act — the whole point is that a
+# proof settles the escrow without one. It is still a required, distinct party.
 
 cat <<BANNER
 
   zk-escrow — ACT I: the ZK happy path
   ------------------------------------
   escrow contract : $ESCROW
-  buyer           : $ADDRESS
+  buyer           : $BUYER_ADDR
   seller          : $SELLER_ADDR
   arbiter         : $ARBITER_ADDR   (never used in this act)
   amount          : $AMOUNT_WEI wei
@@ -77,7 +73,7 @@ run cast send "$ESCROW" \
     "createEscrow(address,address,uint256,uint256)" \
     "$SELLER_ADDR" "$ARBITER_ADDR" "$AMOUNT_WEI" "$COMMITMENT" \
     --rpc-url "$RPC_URL" --chain-id "$BASE_SEPOLIA_CHAIN_ID" \
-    --private-key "$PRIVATE_KEY" > /dev/null
+    --private-key "$BUYER_KEY" > /dev/null
 
 ESCROW_ID="$NEXT_ID"
 log "Created escrow #$ESCROW_ID (state: Created)"
@@ -88,7 +84,7 @@ step "2. Buyer funds it"
 run cast send "$ESCROW" "fund(uint256)" "$ESCROW_ID" \
     --value "$AMOUNT_WEI" \
     --rpc-url "$RPC_URL" --chain-id "$BASE_SEPOLIA_CHAIN_ID" \
-    --private-key "$PRIVATE_KEY" > /dev/null
+    --private-key "$BUYER_KEY" > /dev/null
 
 log "Funded (state: Funded). The money is now locked in the contract."
 run cast call "$ESCROW" "getState(uint256)(uint8)" "$ESCROW_ID" --rpc-url "$RPC_URL"
@@ -124,7 +120,7 @@ run cast send "$ESCROW" \
     "release(uint256,uint256,uint256[2],uint256[2][2],uint256[2])" \
     "$ESCROW_ID" "$NULLIFIER" "$PA" "$PB" "$PC" \
     --rpc-url "$RPC_URL" --chain-id "$BASE_SEPOLIA_CHAIN_ID" \
-    --private-key "$PRIVATE_KEY" > /dev/null
+    --private-key "$BUYER_KEY" > /dev/null
 
 log "Released (state: Released). The secret was never revealed on chain."
 run cast call "$ESCROW" "getState(uint256)(uint8)" "$ESCROW_ID" --rpc-url "$RPC_URL"

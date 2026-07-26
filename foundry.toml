@@ -20,8 +20,9 @@ remappings = [
 # Tests read the checked-in fixture proofs; nothing else touches the filesystem.
 fs_permissions = [{access = "read", path = "./test/fixtures"}]
 
-# No [rpc_endpoints] block, deliberately. Nothing in this repo forks a chain — see
-# the NO-FORK DOCTRINE in CLAUDE.md. Tests are pure-EVM; the recovery rehearsal is
+# No [rpc_endpoints] block, deliberately. Nothing here ever points the EVM at a
+# copy of a remote chain — see the DIRECT-CHAIN DOCTRINE in CLAUDE.md. Tests are
+# pure-EVM; the recovery rehearsal is
 # script/RecoveryDrill.s.sol, which deploys its OWN throwaway contracts on Base
 # Sepolia and takes its endpoint from the environment, not from a named entry here.
 

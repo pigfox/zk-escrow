@@ -14,13 +14,14 @@ import {Groth16Verifier} from "../src/Verifier.sol";
 ///
 ///         Deploys a THROWAWAY V1 proxy, takes an escrow to Disputed under an arbiter
 ///         it then abandons, and drives the recovery: upgrade to V2 → rotate the
-///         arbiter → settle. Every assertion the old fork test made is made here, on
-///         a real chain, with real gas.
+///         arbiter → settle. Every assertion the retired rotation test made is made
+///         here, on a real chain, with real gas.
 ///
-/// @dev This replaces test/ForkRotation.t.sol. That test forked live Base Sepolia
-///      state to rehearse an upgrade against the PRODUCTION proxy; forking is now
-///      banned outright (see the NO-FORK DOCTRINE in CLAUDE.md) and rehearsing
-///      against production was only ever safe because the fork discarded the writes.
+/// @dev This replaces the retired rotation test, which pointed the EVM at a local
+///      copy of live Base Sepolia state to rehearse an upgrade against the
+///      PRODUCTION proxy. That is now banned outright (see the DIRECT-CHAIN
+///      DOCTRINE in CLAUDE.md): rehearsing against production was only ever safe
+///      because the copy discarded the writes.
 ///
 ///      This script is structurally safe instead of conditionally safe: it deploys
 ///      its own proxy in the first broadcast and never learns the address of the
@@ -93,7 +94,7 @@ contract RecoveryDrill is Script {
         escrow.resolveDispute(id, EscrowUpgradeable.Ruling.SellerWins, "recovery drill: delivery evidence accepted");
         vm.stopBroadcast();
 
-        // === 4. the assertions the fork test used to make ===================
+        // === 4. the assertions the retired rotation test used to make =======
         require(
             escrow.pendingWithdrawals(seller) - sellerBefore == AMOUNT, "drill: seller was not credited the amount"
         );

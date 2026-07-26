@@ -12,8 +12,9 @@ import {Groth16Verifier} from "../src/Verifier.sol";
 /// @notice The recovery rehearsal as a PURE-EVM regression test: deploy V1, take an
 ///         escrow to Disputed under an arbiter whose key is lost, then upgrade to V2,
 ///         rotate the arbiter, and settle.
-/// @dev This replaces the old ForkRotationTest, which forked live Base Sepolia state.
-///      Nothing here forks (see the NO-FORK DOCTRINE in CLAUDE.md): the drill builds
+/// @dev This replaces the retired rotation test, which pointed the EVM at a local
+///      copy of live Base Sepolia state. Nothing here copies a chain (see the
+///      DIRECT-CHAIN DOCTRINE in CLAUDE.md): the drill builds
 ///      its own world from scratch, which makes it deterministic, free, and runnable
 ///      in CI with no RPC access at all.
 ///
@@ -77,18 +78,15 @@ contract RecoveryDrillTest is Test {
 
         vm.prank(owner);
         escrow.setArbiter(id, freshArbiter);
-        assertEq(
-            EscrowUpgradeable(address(escrow)).getEscrow(id).arbiter, freshArbiter, "arbiter rotated"
-        );
+        assertEq(EscrowUpgradeable(address(escrow)).getEscrow(id).arbiter, freshArbiter, "arbiter rotated");
 
         uint256 sellerBefore = EscrowUpgradeable(address(escrow)).pendingWithdrawals(seller);
         uint256 buyerBefore = EscrowUpgradeable(address(escrow)).pendingWithdrawals(buyer);
 
         vm.recordLogs();
         vm.prank(freshArbiter);
-        EscrowUpgradeable(address(escrow)).resolveDispute(
-            id, EscrowUpgradeable.Ruling.SellerWins, "delivery evidence accepted"
-        );
+        EscrowUpgradeable(address(escrow))
+            .resolveDispute(id, EscrowUpgradeable.Ruling.SellerWins, "delivery evidence accepted");
 
         // The ruled side is credited, the other side untouched.
         assertEq(
@@ -96,9 +94,7 @@ contract RecoveryDrillTest is Test {
             AMOUNT,
             "seller credited the full amount"
         );
-        assertEq(
-            EscrowUpgradeable(address(escrow)).pendingWithdrawals(buyer), buyerBefore, "buyer untouched"
-        );
+        assertEq(EscrowUpgradeable(address(escrow)).pendingWithdrawals(buyer), buyerBefore, "buyer untouched");
         assertTrue(
             EscrowUpgradeable(address(escrow)).getEscrow(id).state == EscrowUpgradeable.State.Resolved,
             "escrow reached Resolved"
@@ -119,9 +115,8 @@ contract RecoveryDrillTest is Test {
 
         vm.recordLogs();
         vm.prank(freshArbiter);
-        EscrowUpgradeable(address(escrow)).resolveDispute(
-            id, EscrowUpgradeable.Ruling.BuyerWins, "no delivery evidence supplied"
-        );
+        EscrowUpgradeable(address(escrow))
+            .resolveDispute(id, EscrowUpgradeable.Ruling.BuyerWins, "no delivery evidence supplied");
 
         assertEq(
             EscrowUpgradeable(address(escrow)).pendingWithdrawals(buyer) - buyerBefore,
@@ -160,15 +155,15 @@ contract RecoveryDrillTest is Test {
 
         vm.prank(staleArbiter);
         vm.expectRevert();
-        EscrowUpgradeable(address(escrow)).resolveDispute(
-            id, EscrowUpgradeable.Ruling.SellerWins, "should not be allowed"
-        );
+        EscrowUpgradeable(address(escrow))
+            .resolveDispute(id, EscrowUpgradeable.Ruling.SellerWins, "should not be allowed");
     }
 
     /// @notice V1 has no setArbiter at all — the reason the upgrade is load-bearing.
     function test_v1HasNoSetArbiter() public {
         uint256 id = _disputedEscrow();
-        (bool ok,) = address(escrow).call(abi.encodeWithSignature("setArbiter(uint256,address)", id, freshArbiter));
+        (bool ok,) =
+            address(escrow).call(abi.encodeWithSignature("setArbiter(uint256,address)", id, freshArbiter));
         assertFalse(ok, "V1 must not expose setArbiter");
     }
 
@@ -181,7 +176,9 @@ contract RecoveryDrillTest is Test {
             found++;
             assertEq(address(uint160(uint256(logs[i].topics[2]))), expectedArbiter, "event names the arbiter");
             assertEq(
-                address(uint160(uint256(logs[i].topics[3]))), expectedBeneficiary, "event names the beneficiary"
+                address(uint160(uint256(logs[i].topics[3]))),
+                expectedBeneficiary,
+                "event names the beneficiary"
             );
         }
         assertEq(found, 1, "exactly one DisputeResolved");
