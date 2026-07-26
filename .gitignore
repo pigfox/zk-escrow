@@ -65,3 +65,6 @@ coverage-summary.txt
 
 # Throwaway demo identities, generated on first demo run. Never commit.
 .demo-keys.env
+
+# Session tag (convention v1). Local to the working copy, never committed.
+.session-tag

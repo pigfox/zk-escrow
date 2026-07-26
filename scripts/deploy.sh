@@ -28,7 +28,7 @@ if [ ! -f "$ENV_FILE" ]; then
     echo
     echo "  Create it from the template in this repo, then re-run:"
     echo "    cp .env.example ../.env"
-    echo "    \$EDITOR ../.env      # fill in ADDRESS and PRIVATE_KEY"
+    echo "    \$EDITOR ../.env      # fill in DEMO_DEPLOYER_ADDR and DEMO_DEPLOYER_PK"
     echo "    ./scripts/deploy.sh"
     echo
     exit 0
@@ -37,12 +37,12 @@ fi
 # shellcheck disable=SC1090
 set -a; source "$ENV_FILE"; set +a
 
-if [ -z "${ADDRESS:-}" ] || [ -z "${PRIVATE_KEY:-}" ]; then
-    warn "ADDRESS and/or PRIVATE_KEY are empty in $ENV_FILE."
+if [ -z "${DEMO_DEPLOYER_ADDR:-}" ] || [ -z "${DEMO_DEPLOYER_PK:-}" ]; then
+    warn "DEMO_DEPLOYER_ADDR and/or DEMO_DEPLOYER_PK are empty in $ENV_FILE."
     echo
     echo "  Populate ../.env then re-run scripts/deploy.sh:"
-    echo "    ADDRESS=0xYourBaseSepoliaAddress"
-    echo "    PRIVATE_KEY=0xYourPrivateKey"
+    echo "    DEMO_DEPLOYER_ADDR=0xYourBaseSepoliaAddress"
+    echo "    DEMO_DEPLOYER_PK=0xYourPrivateKey"
     echo
     echo "  Fund the address with Base Sepolia ETH first:"
     echo "    https://www.alchemy.com/faucets/base-sepolia"
@@ -52,7 +52,11 @@ if [ -z "${ADDRESS:-}" ] || [ -z "${PRIVATE_KEY:-}" ]; then
     exit 0
 fi
 
-RPC_URL="${RPC_URL:-$DEFAULT_RPC_URL}"
+# DEMO_RPC_URL wins when set. sepolia.base.org rate-limits a host that has been
+# running the chain suites and then fails as a bare "fetch failed" rather than a
+# 429, so the operator box points at another Base Sepolia endpoint. Same chain
+# either way — the chain-id assertion below is what actually guarantees that.
+RPC_URL="${DEMO_RPC_URL:-${RPC_URL:-$DEFAULT_RPC_URL}}"
 
 log "Verifying the RPC endpoint is Base Sepolia"
 ACTUAL_CHAIN_ID="$(cast chain-id --rpc-url "$RPC_URL")" \
@@ -64,13 +68,13 @@ fi
 
 # Confirm the key matches the declared address before spending gas on a
 # deploy that would end up owned by someone else.
-DERIVED="$(cast wallet address --private-key "$PRIVATE_KEY")"
-if [ "${DERIVED,,}" != "${ADDRESS,,}" ]; then
-    die "PRIVATE_KEY derives to $DERIVED but ADDRESS is $ADDRESS — check ../.env"
+DERIVED="$(cast wallet address --private-key "$DEMO_DEPLOYER_PK")"
+if [ "${DERIVED,,}" != "${DEMO_DEPLOYER_ADDR,,}" ]; then
+    die "DEMO_DEPLOYER_PK derives to $DERIVED but DEMO_DEPLOYER_ADDR is $DEMO_DEPLOYER_ADDR — check ../.env"
 fi
 
-BALANCE="$(cast balance "$ADDRESS" --rpc-url "$RPC_URL")"
-log "Deployer $ADDRESS has $(cast from-wei "$BALANCE") ETH on Base Sepolia"
+BALANCE="$(cast balance "$DEMO_DEPLOYER_ADDR" --rpc-url "$RPC_URL")"
+log "Deployer $DEMO_DEPLOYER_ADDR has $(cast from-wei "$BALANCE") ETH on Base Sepolia"
 if [ "$BALANCE" = "0" ]; then
     die "deployer has no ETH. Fund it: https://www.alchemy.com/faucets/base-sepolia"
 fi
@@ -90,10 +94,10 @@ else
 fi
 
 log "Deploying"
-# PRIVATE_KEY reaches the script through the environment, never the command
+# DEMO_DEPLOYER_PK reaches the script through the environment, never the command
 # line, so it cannot show up in shell history or process listings.
 forge "${FORGE_ARGS[@]}"
 
 echo
-log "Done. Copy the proxy address into ../.env as ESCROW_ADDRESS and into the"
+log "Done. Copy the proxy address into ../.env as DEMO_ESCROW_ADDRESS and into the"
 log "README's deployed-addresses block."

@@ -26,7 +26,9 @@ contract Deploy is Script {
             revert WrongChain(BASE_SEPOLIA_CHAIN_ID, block.chainid);
         }
 
-        uint256 deployerKey = vm.envUint("PRIVATE_KEY");
+        // DEMO_DEPLOYER_PK is the unified role key shared by all three demo repos
+        // (see pigfox2-repos/KEYS.md for the addresses and what each role may do).
+        uint256 deployerKey = vm.envUint("DEMO_DEPLOYER_PK");
         address deployer = vm.addr(deployerKey);
 
         vm.startBroadcast(deployerKey);
@@ -50,6 +52,6 @@ contract Deploy is Script {
         console2.log("Proxy (USE THIS):", address(proxy));
         console2.log("");
         console2.log("Add to ../.env for the demo scripts and the agent:");
-        console2.log("  ESCROW_ADDRESS=", address(proxy));
+        console2.log("  DEMO_ESCROW_ADDRESS=", address(proxy));
     }
 }

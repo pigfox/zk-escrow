@@ -26,18 +26,28 @@ winner but can never pay itself.
 
 | Contract | Address |
 | --- | --- |
-| **Proxy** ← interact with this | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84#code) |
-| Implementation — V2 (current) | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637`](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637#code) |
-| Implementation — V1 (original) | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4#code) |
-| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56#code) |
+| **Proxy** ← interact with this | [`0x4421E53D0dd051159d1a0F03d45554313e3e9774`](https://sepolia.basescan.org/address/0x4421E53D0dd051159d1a0F03d45554313e3e9774#code) |
+| Implementation — V1 | [`0x36dDB82CCE0AE251d68369C794070a09021D6825`](https://sepolia.basescan.org/address/0x36dDB82CCE0AE251d68369C794070a09021D6825#code) |
+| Verifier | [`0x20B98B460c1252974177215EaDa7A61259Ad5825`](https://sepolia.basescan.org/address/0x20B98B460c1252974177215EaDa7A61259Ad5825#code) |
+| Owner | `0xb6c3a56CA2f99e3F5d7d16ad968df9f71cCC184D` |
 
-All verified on BaseScan. Chain id 84532. The proxy was upgraded V1 → V2 to add
-the arbiter-rotation recovery — see [Recovery](#recovery-the-v2-arbiter-rotation).
+All verified on BaseScan. Chain id 84532. Deployed **2026-07-26**, fresh — the
+contract has no escrow history yet, and its live counters read from chain, so the
+demo shows real zeroes until traffic arrives.
 
-Four escrows have run to completion: **#0 and #1 released by zero-knowledge
+> **Everything below this line describes the v1 deployment**, which is retired but
+> still on chain: the four completed escrows, the nine stranded disputes, the UUPS
+> upgrade that recovered them, and the AI rulings all happened *there*. It is kept
+> because it is the honest record of how this contract behaved under real traffic —
+> but none of those numbers belong to the deployment above. v1 addresses are listed
+> under [v1 deployment (retired)](#v1-deployment-retired-2026-07-26).
+
+## The v1 record
+
+Four escrows ran to completion on v1: **#0 and #1 released by zero-knowledge
 proof**, **#2 and #3 settled by the AI arbiter**. Across all four the arbiter
 routed 0.003 ETH between buyers and sellers and took **nothing** — its
-`pendingWithdrawals` balance is `0`, and the contract's ETH balance equals
+`pendingWithdrawals` balance was `0`, and the contract's ETH balance equalled
 `totalPendingWithdrawals` to the wei. Invariants (a) and (b) below are not just
 fuzzer output; they held against real traffic.
 
@@ -64,11 +74,25 @@ authority) — without touching the escrow logic or the funds:
 3. **All nine arbiters were rotated** to the fresh keyed address, each read back on
    chain to confirm.
 
-The upgrade was rehearsed against **live forked state first**
-(`test/ForkRotation.t.sol`, gated behind `FORK_REHEARSAL=true`): deploy V2 →
+The upgrade was rehearsed before any real transaction was broadcast: deploy V2 →
 upgrade → `setArbiter` → `resolveDispute` as the new arbiter, asserting funds route
-to the ruled side, the state reaches `Resolved`, and the arbiter is never credited —
-before any real transaction was broadcast.
+to the ruled side, the state reaches `Resolved`, and the arbiter is never credited.
+
+That rehearsal originally ran against live *forked* state. It no longer forks
+anything — forking is now banned outright in this repo — and ships as two pieces:
+
+- **`test/RecoveryDrill.t.sol`** — the same sequence in pure EVM, built from
+  scratch with no RPC access. Runs on every `forge test`, including in CI, and
+  covers the ruled-either-way outcomes plus the owner-only and stale-arbiter
+  refusals.
+- **`script/RecoveryDrill.s.sol`** — the same sequence against **real Base
+  Sepolia**, on contracts it deploys itself. It never learns the live proxy's
+  address, so it cannot touch the demo. Gated behind `RECOVERY_DRILL=true`:
+
+  ```sh
+  RECOVERY_DRILL=true forge script script/RecoveryDrill.s.sol:RecoveryDrill \
+    --rpc-url "$DEMO_RPC_URL" --broadcast -vv
+  ```
 
 | Step | Address / tx |
 | --- | --- |
@@ -752,3 +776,22 @@ docs/slither-exclusions.md  every suppressed detector, with rationale
 ## Licence
 
 MIT, except `src/Verifier.sol`, which snarkjs emits under GPL-3.0.
+
+## v1 deployment (retired 2026-07-26)
+
+The contracts below were the demo's first life. They are still on chain and still
+hold their history — including the nine disputed escrows recovered in the live UUPS
+upgrade described above, whose settlements and rationales remain readable there.
+Nothing reads them any more; the live demo points at the addresses at the top of
+this file.
+
+| Contract | v1 address |
+| --- | --- |
+| Escrow proxy | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84) |
+| V2 implementation | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637`](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637) |
+| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56) |
+| Owner | `0x957a8D5FaEbb5D2179ff2Bc79d114AAFBe714931` |
+| Arbiter | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` |
+
+The rebirth replaced every key and redeployed from scratch; see
+`pigfox2-repos/KEYS.md` for the role table and the full retired list.
