@@ -15,6 +15,10 @@ remappings = [
     "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/",
     "@openzeppelin/contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/",
     "forge-std/=lib/forge-std/src/",
+    # PIGFOX SOLIDITY PIPELINE v1, vendored as a submodule. The shared property
+    # base lives here; the gate scripts alongside it are what CI runs, so a local
+    # run and a CI run are the same bytes.
+    "pipeline/=lib/solidity-pipeline/src/",
 ]
 
 # Tests read the checked-in fixture proofs; nothing else touches the filesystem.

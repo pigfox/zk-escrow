@@ -446,12 +446,27 @@ two real checked-in proofs that share a commitment and differ in nullifier.
 
 ## Testing
 
+Verified by the
+[**PIGFOX SOLIDITY PIPELINE v1**](https://github.com/pigfox/solidity-pipeline) —
+the estate's single definition of green. Most of it came *from* this repo: the
+forced rebuild before fuzzing, the property-count assertion, the coverage gate
+that refuses to pass on a report it cannot parse, and the doctrine gate that
+plants a token to prove it still matches were all written here, then factored out
+so the other three demo repos get them too and a fix lands once instead of four
+times.
+
+The pipeline is vendored as a submodule at `lib/solidity-pipeline`, so the gates
+that run in CI are the same bytes you run locally:
+
 ```bash
-forge test                  # 103 tests: unit, fuzz, invariants
-./scripts/coverage.sh       # coverage gate — fails below 100% on src/
-echidna . --contract Properties --config echidna.yaml
-medusa fuzz --config medusa.json
-slither . --config-file slither.config.json
+git submodule update --init --recursive   # brings in lib/solidity-pipeline
+forge test                  # 105 tests: unit, fuzz, invariants
+lib/solidity-pipeline/scripts/coverage.sh          # fails below 100% on src/
+lib/solidity-pipeline/scripts/no-chain-copy-gate.sh all
+echidna . --contract Properties --config echidna.yaml       # 6/6, 100k calls
+medusa fuzz --config medusa.json                            # 6/6, 100k calls
+slither . --ignore-compile --fail-low \
+  --config-file lib/solidity-pipeline/slither.config.json   # 0 findings
 cd agent && go test ./... -race -coverprofile=coverage.out
 ```
 
@@ -544,8 +559,11 @@ Both gates are hard failures in CI, not reports.
 
 #### The one documented exclusion: `src/Verifier.sol`
 
-`scripts/coverage.sh` requires 100% on all four metrics for every file under
-`src/`, with exactly one exclusion. `Verifier.sol` is generated verbatim by
+`lib/solidity-pipeline/scripts/coverage.sh` requires 100% on all four metrics for
+every file under `src/`, with exactly one exclusion — named on the command line
+and printed as `SKIP` on every run, never folded into a percentage. The gate also
+fails if that name ever stops matching a real file, so the exclusion cannot rot
+into a hole that reads as a decision. `Verifier.sol` is generated verbatim by
 snarkjs from the proving key. Its residual uncovered lines are the
 inline-assembly early-exit paths taken when the BN254 `ecAdd` / `ecMul` /
 pairing **precompiles themselves** report failure. Those cannot be provoked from
@@ -558,10 +576,12 @@ The verifier is not untested for it. `test/ZkRelease.t.sol` drives real Groth16
 proofs through the escrow end to end, including tampered public signals,
 off-curve points, zero proofs, wrong commitments and cross-escrow replay.
 
-Analyzer exclusions are documented the same way, in
-[`docs/slither-exclusions.md`](docs/slither-exclusions.md) — seven detectors,
-six of which fire only on the generated verifier. CI fails on any finding that
-survives them.
+Analyzer exclusions are documented the same way. The reasoning now lives once, in
+the pipeline's
+[shared exclusions document](https://github.com/pigfox/solidity-pipeline/blob/main/docs/slither-exclusions.md);
+[`docs/slither-exclusions.md`](docs/slither-exclusions.md) records where each one
+fires *in this repo* — seven detectors, six of which fire only on the generated
+verifier. CI fails on any finding that survives them.
 
 ---
 

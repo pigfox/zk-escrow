@@ -90,6 +90,46 @@ contract InvariantsTest is Test {
         );
     }
 
+    // --- the harness's own declaration --------------------------------------
+
+    /// @dev The count `lib/solidity-pipeline/scripts/property-count.sh` checks
+    ///      statically — and that Echidna and Medusa each assert at runtime —
+    ///      checked once more here against the predicates this file actually
+    ///      drives. A stale artifact once shrank a property set in this repo and
+    ///      the job reported green on the smaller one; that is the whole reason
+    ///      the number is stated in four independent places.
+    function test_declaredPropertyCountMatchesThisFile() public view {
+        assertEq(properties.pigfoxPropertyCount(), 6, "declared property count");
+        assertEq(
+            _predicatesDrivenHere(), properties.pigfoxPropertyCount(), "predicates asserted by this file"
+        );
+    }
+
+    function test_harnessSaysWhatItProves() public view {
+        assertEq(
+            properties.pigfoxHarnessDescription(),
+            "escrowed ETH always equals what is owed, an arbiter never profits, and a nullifier spends once"
+        );
+    }
+
+    /// @dev Counted by calling every predicate this file asserts. Deliberately a
+    ///      literal list rather than a number: adding an `invariant_` above
+    ///      without adding it here leaves the two disagreeing, which is the point.
+    function _predicatesDrivenHere() internal view returns (uint256 n) {
+        properties.echidna_balance_equals_obligations();
+        n++;
+        properties.echidna_arbiter_never_credited();
+        n++;
+        properties.echidna_state_machine_valid();
+        n++;
+        properties.echidna_obligations_never_exceed_funded();
+        n++;
+        properties.echidna_nullifier_never_reused();
+        n++;
+        properties.echidna_ledger_consistent();
+        n++;
+    }
+
     /// @notice Proves the run was not inert.
     /// @dev Not an assertion about the protocol — an assertion about the test.
     ///      A property suite that never reaches an interesting state reports

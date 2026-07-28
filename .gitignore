@@ -53,15 +53,19 @@ build/
 node_modules/
 npm-debug.log*
 
-# Medusa fuzzing corpus
+# Property-fuzzing working state. The CORPORA are regenerable and machine-local;
+# committing them would let a stale corpus decide what a fresh run explores. The
+# engine transcripts are inputs to the property-count gate, not artifacts.
 medusa-corpus/
+echidna-corpus/
 crytic-export/
+echidna-output.txt
+medusa-output.txt
+slither_results.json
+coverage-summary.txt
 
 # Claude Code local settings
 .claude/settings.local.json
-echidna-corpus/
-slither_results.json
-coverage-summary.txt
 
 # Throwaway demo identities, generated on first demo run. Never commit.
 .demo-keys.env

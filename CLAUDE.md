@@ -23,7 +23,7 @@ contract lives in the `pigfox2` repo at `/demos/zk-escrow`.
   snapshot or mirror of a remote chain's state: not the `vm.create*` / `vm.select*` /
   `vm.roll*` chain-copy cheatcode family, not forge's chain-copy URL flag, not `anvil`,
   not an `[rpc_endpoints]` block in `foundry.toml`, not a local node.
-- Enforced MECHANICALLY, not by good intentions: `scripts/no-chain-copy-gate.sh` runs in
+- Enforced MECHANICALLY, not by good intentions: `lib/solidity-pipeline/scripts/no-chain-copy-gate.sh` runs in
   CI, greps every tracked file for the banned tokens, and self-tests by planting one and
   refusing to pass unless it is caught. Doctrine that only lives in prose is not enforced.
 - The recovery rehearsal is `RecoveryDrill`, gated on `RECOVERY_DRILL=true`. It deploys its

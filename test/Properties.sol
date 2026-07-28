@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
+import {PigfoxProperties} from "pipeline/PigfoxProperties.sol";
+
 import {EscrowUpgradeable} from "../src/EscrowUpgradeable.sol";
 import {MockVerifier} from "./mocks/MockVerifier.sol";
 import {Actor} from "./Actor.sol";
@@ -25,7 +27,7 @@ import {Actor} from "./Actor.sol";
 ///      Keeping one property contract means a property can never drift between
 ///      the three engines. Foundry's `Invariants.t.sol` calls the same
 ///      `echidna_*` predicates that Echidna and Medusa evaluate.
-contract Properties {
+contract Properties is PigfoxProperties {
     /*//////////////////////////////////////////////////////////////
                                  STATE
     //////////////////////////////////////////////////////////////*/
@@ -490,6 +492,21 @@ contract Properties {
     function withdraw(uint256 seed) public {
         Actor who = actorPool[seed % POOL_SIZE];
         who.exec(address(escrow), 0, abi.encodeCall(EscrowUpgradeable.withdraw, ()));
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              DECLARATION
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc PigfoxProperties
+    function pigfoxPropertyCount() public pure override returns (uint256) {
+        return 6;
+    }
+
+    /// @inheritdoc PigfoxProperties
+    function pigfoxHarnessDescription() public pure override returns (string memory) {
+        return
+            "escrowed ETH always equals what is owed, an arbiter never profits, and a nullifier spends once";
     }
 
     /*//////////////////////////////////////////////////////////////

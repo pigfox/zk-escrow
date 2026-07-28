@@ -1,8 +1,8 @@
 name: CI
 
-# Everything here runs on a clean checkout with NO secrets. The escrow's
-# build, test, fuzz and analysis paths never read ../.env — only deploying and
-# running the agent need credentials, and neither happens in CI.
+# Everything here runs on a clean checkout with NO secrets. The escrow's build,
+# test, fuzz and analysis paths never read ../.env — only deploying, upgrading
+# and running the arbiter agent need credentials, and none of that happens here.
 on:
   push:
     branches: [main]
@@ -16,93 +16,53 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FOUNDRY_PROFILE: ci
-  # How many echidna_* predicates the harness exposes. Both fuzzers assert they
-  # registered exactly this many, so a property that silently stops being picked
-  # up — a rename, a stale artifact, a bad build — fails the job instead of
-  # reporting a smaller green run.
-  # bump when adding an echidna_* predicate.
-  EXPECTED_PROPERTIES: 6
-
 jobs:
   # ---------------------------------------------------------------------------
-  # Enforces the DIRECT-CHAIN DOCTRINE mechanically: nothing in this repo may
-  # point the EVM at a copy of a remote chain's state. The gate self-tests by
-  # planting a token, so a scan that has silently stopped matching fails the job
-  # instead of reporting the same green as a clean tree.
+  # PIGFOX SOLIDITY PIPELINE v1 — the estate's one verification standard, defined
+  # once in pigfox/solidity-pipeline and consumed here rather than copied.
   #
-  # fetch-depth: 0 is required — the gate uses `git grep` over tracked files.
-  no-chain-copy:
-    name: no-chain-copy (doctrine gate)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          fetch-depth: 0
+  # This repo is where most of the pipeline came FROM: the forced rebuild before
+  # fuzzing, the property-count assertion, the coverage gate that refuses to pass
+  # on a report it cannot parse, and the doctrine gate that plants a token to
+  # prove it still matches. Those were written here, then factored out so the
+  # other three repos get them too — and so a fix lands once instead of four
+  # times. The version here is the factored one, plus the guards the other three
+  # repos contributed on the way.
+  #
+  # The gate SCRIPTS come from lib/solidity-pipeline, vendored as a submodule at a
+  # commit this repo pins, so a local run and this run are the same bytes.
+  #
+  # https://github.com/pigfox/solidity-pipeline
+  pipeline:
+    uses: pigfox/solidity-pipeline/.github/workflows/solidity.yml@v1
+    with:
+      # test/Properties.sol declares six echidna_* predicates and states the same
+      # number in pigfoxPropertyCount(). Both fuzzers assert they registered
+      # exactly this many. That guard exists because of this repo: a stale
+      # crytic-export once shrank a five-property set to four and the job passed.
+      #
+      # Bump this, pigfoxPropertyCount() and the predicate together, in one commit.
+      expected-properties: 6
 
-      - name: Chain-copy token gate (scan + self-test)
-        run: ./scripts/no-chain-copy-gate.sh
+      # src/Verifier.sol is generated verbatim by snarkjs from the proving key.
+      # Its residual uncovered lines are the inline-assembly early exits taken
+      # when the BN254 ecAdd / ecMul / pairing precompiles themselves report
+      # failure. Those cannot be made to fail from a test: inputs that are merely
+      # wrong are rejected by the reachable `checkField` branch, which IS covered.
+      # Excluded BY NAME — the gate prints it as SKIP and fails the build if the
+      # name ever stops matching a real file — and the verifier is still
+      # exercised end-to-end by real Groth16 proofs in test/ZkRelease.t.sol.
+      coverage-exclusions: src/Verifier.sol
 
-  # ---------------------------------------------------------------------------
-  fmt:
-    name: fmt (formatting gate)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4.2.2
-
-      # Pinned, NOT `stable`, and this is the whole point of a separate job.
-      # forge's formatter changes between releases: a tree formatted by 1.4.2
-      # does not satisfy `--check` under 1.7, so gating on a floating `stable`
-      # turns an unrelated upstream release into a red build on an unchanged
-      # tree. Every other job tracks stable deliberately; only this one must be
-      # reproducible. Bump this pin and re-run `forge fmt test/` together, never
-      # separately.
-      - uses: foundry-rs/foundry-toolchain@v1.3.1
-        with:
-          version: v1.4.2
-
-      # Scoped to test/ because that is the tree that is actually formatted.
-      # src/ and script/ still have pre-existing violations; widening this is a
-      # one-word change once they are cleaned up, and src/Verifier.sol is
-      # already excluded in foundry.toml's [fmt] ignore so widening cannot
-      # reformat generated output.
-      - name: Format check
-        run: forge fmt --check test/
-
-  # ---------------------------------------------------------------------------
-  forge:
-    name: forge (build, test, invariants, coverage gate)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          submodules: recursive
-
-      - uses: foundry-rs/foundry-toolchain@v1.3.1
-        with:
-          version: stable
-
-      - name: Build
-        run: forge build --sizes
-
-      - name: Test (unit, fuzz and invariants)
-        run: forge test -vvv
-
-      - name: Coverage gate (100% on src/, one documented exclusion)
-        # scripts/coverage.sh exits non-zero on any shortfall, and also on a
-        # report it cannot parse — a format change must not pass by default.
-        run: ./scripts/coverage.sh
-
-      - name: Upload coverage summary
-        if: always()
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: forge-coverage-summary
-          path: coverage-summary.txt
-          if-no-files-found: warn
+      # src/ and script/ still carry pre-existing formatting violations, and
+      # src/Verifier.sol is additionally in foundry.toml's [fmt] ignore so
+      # widening this can never reformat generated output. Widening it is a
+      # one-word change once those are cleaned up.
+      fmt-paths: test
 
   # ---------------------------------------------------------------------------
+  # Repo-specific, and deliberately NOT in the shared pipeline: the pipeline
+  # covers Solidity, and does not try to be everything.
   go:
     name: go agent (vet, lint, test, 100% coverage gate)
     runs-on: ubuntu-24.04
@@ -147,150 +107,3 @@ jobs:
             exit 1
           fi
           echo "Go coverage gate passed: $total"
-
-  # ---------------------------------------------------------------------------
-  echidna:
-    name: echidna (property fuzzing)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          submodules: recursive
-
-      - uses: foundry-rs/foundry-toolchain@v1.3.1
-        with:
-          version: stable
-
-      - name: Install crytic-compile and slither
-        run: |
-          pipx install crytic-compile
-          pipx install slither-analyzer
-
-      # Echidna is installed as a plain binary rather than run via
-      # crytic/echidna-action, because that action runs echidna inside a
-      # container that has no `forge` on PATH — and crytic-compile shells out
-      # to `forge config --json` to read the project layout. Installing it here
-      # keeps echidna in the same environment as the toolchain it needs, and
-      # makes the CI invocation identical to the documented local one.
-      - name: Install echidna
-        run: |
-          set -euo pipefail
-          curl -sSL -o echidna.tar.gz \
-            https://github.com/crytic/echidna/releases/download/v2.2.6/echidna-2.2.6-x86_64-linux.tar.gz
-          tar xzf echidna.tar.gz
-          sudo install -m 0755 echidna /usr/local/bin/echidna
-          echidna --version
-
-      # Echidna consumes the artifacts forge produces (--foundry-ignore-compile
-      # in echidna.yaml), so crytic-compile never needs to fetch its own solc.
-      #
-      # The rebuild is FORCED and crytic-export is deleted, unconditionally and
-      # immediately before the fuzz step. `forge coverage` overwrites out/ with
-      # coverage-instrumented artifacts, and crytic-compile will happily consume
-      # those — or a stale crytic-export/ — and register a property set that
-      # does not match the source. That silently shrank the suite to 4 of 5
-      # properties once already. This job does not currently run coverage, but
-      # the guard is here so a future reorder cannot bring the bug back.
-      - name: Build artifacts for crytic-compile (forced, no stale exports)
-        run: |
-          set -euo pipefail
-          rm -rf crytic-export
-          forge build --force
-
-      - name: Fuzz
-        # Target the project directory, not the single file: crytic-compile
-        # treats a lone .sol path as a standalone solc target and tries to
-        # download a matching compiler.
-        run: |
-          set -euo pipefail
-          echidna . --contract Properties --config echidna.yaml | tee echidna-output.txt
-          found="$(grep -cE '^echidna_[a-z_]+: (passing|passed)' echidna-output.txt || true)"
-          echo "echidna registered $found properties"
-          if [ "$found" != "$EXPECTED_PROPERTIES" ]; then
-            echo "::error::echidna registered $found properties, expected $EXPECTED_PROPERTIES"
-            echo "A property stopped being picked up — check for a rename, a"
-            echo "stale artifact, or a testPrefixes mismatch. If a predicate was"
-            echo "added or removed on purpose, bump EXPECTED_PROPERTIES."
-            exit 1
-          fi
-
-  # ---------------------------------------------------------------------------
-  medusa:
-    name: medusa (property fuzzing)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          submodules: recursive
-
-      - uses: foundry-rs/foundry-toolchain@v1.3.1
-        with:
-          version: stable
-
-      - uses: actions/setup-go@v5.1.0
-        with:
-          go-version-file: agent/go.mod
-          cache: false
-
-      - name: Install crytic-compile and slither
-        # Medusa shells out to slither for its own analysis pass; without it
-        # the run still works but loses that coverage guidance.
-        run: |
-          pipx install crytic-compile
-          pipx install slither-analyzer
-
-      - name: Install medusa
-        run: |
-          set -euo pipefail
-          go install github.com/crytic/medusa@v1.5.1
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
-      # Forced, and crytic-export deleted — same reasoning as the echidna job:
-      # crytic-compile will consume coverage-instrumented or stale artifacts
-      # without complaint and register a property set that does not match the
-      # source, which reads as a smaller green run rather than a failure.
-      - name: Build artifacts for crytic-compile (forced, no stale exports)
-        run: |
-          set -euo pipefail
-          rm -rf crytic-export
-          forge build --force
-
-      - name: Fuzz
-        # Medusa exits non-zero when a property fails, which fails the job.
-        run: |
-          set -euo pipefail
-          medusa fuzz --config medusa.json 2>&1 | tee medusa-output.txt
-          passed="$(sed -r 's/\x1b\[[0-9;]*m//g' medusa-output.txt \
-            | grep -cE '\[PASSED\] Property Test:' || true)"
-          echo "medusa passed $passed properties"
-          if [ "$passed" != "$EXPECTED_PROPERTIES" ]; then
-            echo "::error::medusa passed $passed properties, expected $EXPECTED_PROPERTIES"
-            echo "A property stopped being picked up — check for a rename, a"
-            echo "stale artifact, or a testPrefixes mismatch. If a predicate was"
-            echo "added or removed on purpose, bump EXPECTED_PROPERTIES."
-            exit 1
-          fi
-
-  # ---------------------------------------------------------------------------
-  slither:
-    name: slither (static analysis)
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4.2.2
-        with:
-          submodules: recursive
-
-      - uses: foundry-rs/foundry-toolchain@v1.3.1
-        with:
-          version: stable
-
-      - name: Build artifacts for crytic-compile
-        run: forge build
-
-      - uses: crytic/slither-action@v0.4.0
-        with:
-          slither-config: slither.config.json
-          # Reuse forge's artifacts; fail the job on any finding that survives
-          # the documented exclusions in docs/slither-exclusions.md.
-          slither-args: --ignore-compile
-          fail-on: low
