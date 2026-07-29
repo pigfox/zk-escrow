@@ -699,7 +699,12 @@ than implying otherwise.
 
 ## Deployment reference
 
-The three addresses are at the [top of this README](#live-on-base-sepolia).
+**Everything in this section is the live deployment.** The retired v1 estate has
+its own addresses, its own verification recipe and its own deploy transactions,
+all of them under [v1 deployment (retired)](#v1-deployment-retired-2026-07-26) —
+nothing here links to it.
+
+The three live addresses are at the [top of this README](#live-on-base-sepolia).
 Deployed 2026-07-26 to chain id 84532; the upgrade authority is
 [`0xb6c3a56C…`](https://sepolia.basescan.org/address/0xb6c3a56CA2f99e3F5d7d16ad968df9f71cCC184D).
 
@@ -712,30 +717,29 @@ the optimizer on at 200 runs — the same settings `foundry.toml` pins, so the
 published source matches what the tests and fuzzers ran against.
 
 <details>
-<summary>Reproducing the verification</summary>
+<summary>Reproducing the verification — live addresses</summary>
 
-The deploy itself ran without an `ETHERSCAN_API_KEY`, so verification was done
-after the fact. With the key set in `../.env`:
+With an `ETHERSCAN_API_KEY` set in `../.env`:
 
 ```bash
 set -a; source ../.env; set +a
 
-forge verify-contract 0xE6372Ff3083B9fea441204BF5617a5afF02e2D56 \
+forge verify-contract 0x20B98B460c1252974177215EaDa7A61259Ad5825 \
     src/Verifier.sol:Groth16Verifier \
     --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
 
-forge verify-contract 0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4 \
+forge verify-contract 0x36dDB82CCE0AE251d68369C794070a09021D6825 \
     src/EscrowUpgradeable.sol:EscrowUpgradeable \
     --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
 
-forge verify-contract 0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84 \
+forge verify-contract 0x4421E53D0dd051159d1a0F03d45554313e3e9774 \
     lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy \
     --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch \
     --constructor-args "$(cast abi-encode 'constructor(address,bytes)' \
-        0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4 \
+        0x36dDB82CCE0AE251d68369C794070a09021D6825 \
         "$(cast calldata 'initialize(address,address)' \
-            0xE6372Ff3083B9fea441204BF5617a5afF02e2D56 \
-            0x49FE3B2731090b93d297D259BD1eFFC5DB015edF)")"
+            0x20B98B460c1252974177215EaDa7A61259Ad5825 \
+            0xb6c3a56CA2f99e3F5d7d16ad968df9f71cCC184D)")"
 ```
 
 The proxy's constructor args encode the implementation address plus the
@@ -744,26 +748,28 @@ The proxy's constructor args encode the implementation address plus the
 
 </details>
 
-> **One manual step remains.** BaseScan has the proxy's source but has not yet
-> been told it *is* a proxy, so it does not expose Read/Write-as-Proxy or link
-> through to the implementation's ABI. That detection is a UI action and cannot
-> be scripted: open the [proxy address](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84#code)
+> **One manual step remains on the live proxy.** BaseScan holds its source
+> (verified as `ERC1967Proxy`) but has not been told it *is* a proxy, so it does
+> not expose Read/Write-as-Proxy or link through to the implementation's ABI.
+> That detection is a UI action and cannot be scripted: open the
+> [live proxy](https://sepolia.basescan.org/address/0x4421E53D0dd051159d1a0F03d45554313e3e9774#code)
 > → **Contract** → **More Options** → **Is this a proxy?** → **Verify**. Until
 > then, interact via `cast` (every one-liner above works regardless) or through
 > the implementation's ABI.
 
-### Deployment transactions
+### Deployment transactions — live
 
 | Contract | Tx |
 | --- | --- |
-| `Groth16Verifier` | [`0x1381d46a…`](https://sepolia.basescan.org/tx/0x1381d46ab23cab5d5bd45d89189987bd9c3194630bc983d91486e6c3f55ad015) |
-| `EscrowUpgradeable` | [`0xbc5456e6…`](https://sepolia.basescan.org/tx/0xbc5456e64bc7a6780b0abc57f185105a9c0a760a6b8ea4f6498b1880e684bc03) |
-| `ERC1967Proxy` | [`0xb4d8bcb6…`](https://sepolia.basescan.org/tx/0xb4d8bcb62bc1a6998d274a3816b28985ef75b6cb0d27fc9678635c02346169cd) |
+| `Groth16Verifier` | [`0x6fa38df4…`](https://sepolia.basescan.org/tx/0x6fa38df477974570ecc788175a03b998db47ced4cba371e92dfdbbf383105657) |
+| `EscrowUpgradeable` | [`0x1e69bc3f…`](https://sepolia.basescan.org/tx/0x1e69bc3f5cd58b14936198ff913c7a362b08c9b417ef7acbeec415665c8ca379) |
+| `ERC1967Proxy` | [`0xab7806cc…`](https://sepolia.basescan.org/tx/0xab7806cc9833cb1bdab8f3de0ae75b0feaa6897738ace43552887c04f9f62eea) |
 
-All three succeeded (receipt status `0x1`), for a total of 0.0000139929 ETH in
-gas. Post-deploy state was checked on chain: `verifier()` returns the deployed
-verifier, `owner()` returns the deployer, the ERC-1967 implementation slot holds
-the implementation address, and `initialize()` reverts on a second call.
+All three landed in block 44641562 and succeeded (receipt status `0x1`), for a
+total of 0.000013600968 ETH in gas. Post-deploy state was checked on chain, and
+re-checked when this section was written: `verifier()` returns
+`0x20B98B46…`, `owner()` returns `0xb6c3a56C…`, and the ERC-1967 implementation
+slot holds `0x36dDB82C…`. `initialize()` reverts on a second call.
 
 ---
 
@@ -828,19 +834,66 @@ MIT, except `src/Verifier.sol`, which snarkjs emits under GPL-3.0.
 
 ## v1 deployment (retired 2026-07-26)
 
-The contracts below were the demo's first life. They are still on chain and still
-hold their history — including the nine disputed escrows recovered in the live UUPS
-upgrade described above, whose settlements and rationales remain readable there.
-Nothing reads them any more; the live demo points at the addresses at the top of
-this file.
+> **Retired. Do not interact with anything in this section.** These contracts are
+> still on chain and still hold their history, which is why they are documented
+> here, but nothing reads them any more and no demo points at them. The live
+> addresses are at the [top of this file](#live-on-base-sepolia).
 
-| Contract | v1 address |
+The contracts below were the demo's first life — including the nine disputed
+escrows recovered in the UUPS upgrade described above, whose settlements and
+rationales remain readable there.
+
+| Contract | v1 address (retired) |
 | --- | --- |
 | Escrow proxy | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84) |
+| V1 implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4) |
 | V2 implementation | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637`](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637) |
 | Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56) |
-| Owner | `0x957a8D5FaEbb5D2179ff2Bc79d114AAFBe714931` |
-| Arbiter | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` |
+| Owner (current) | `0x957a8D5FaEbb5D2179ff2Bc79d114AAFBe714931` |
+| Owner at `initialize` | `0x49FE3B2731090b93d297D259BD1eFFC5DB015edF` — later transferred; it is the value in the v1 constructor args below |
+| Arbiter (post-rotation) | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` |
+
+Read back from chain: the proxy's ERC-1967 implementation slot holds the V2
+implementation `0x1cB2207f…`, and `owner()` returns `0x957a8D5F…`.
+
+### v1 deployment transactions (retired)
+
+| Contract | Tx |
+| --- | --- |
+| `Groth16Verifier` | [`0x1381d46a…`](https://sepolia.basescan.org/tx/0x1381d46ab23cab5d5bd45d89189987bd9c3194630bc983d91486e6c3f55ad015) |
+| `EscrowUpgradeable` | [`0xbc5456e6…`](https://sepolia.basescan.org/tx/0xbc5456e64bc7a6780b0abc57f185105a9c0a760a6b8ea4f6498b1880e684bc03) |
+| `ERC1967Proxy` | [`0xb4d8bcb6…`](https://sepolia.basescan.org/tx/0xb4d8bcb62bc1a6998d274a3816b28985ef75b6cb0d27fc9678635c02346169cd) |
+
+All three succeeded (receipt status `0x1`), for a total of 0.0000139929 ETH in gas.
+
+<details>
+<summary>How the v1 contracts were verified (retired — kept as the record)</summary>
+
+The v1 deploy ran without an `ETHERSCAN_API_KEY`, so verification was done after
+the fact:
+
+```bash
+set -a; source ../.env; set +a
+
+forge verify-contract 0xE6372Ff3083B9fea441204BF5617a5afF02e2D56 \
+    src/Verifier.sol:Groth16Verifier \
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
+
+forge verify-contract 0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4 \
+    src/EscrowUpgradeable.sol:EscrowUpgradeable \
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
+
+forge verify-contract 0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84 \
+    lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy \
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch \
+    --constructor-args "$(cast abi-encode 'constructor(address,bytes)' \
+        0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4 \
+        "$(cast calldata 'initialize(address,address)' \
+            0xE6372Ff3083B9fea441204BF5617a5afF02e2D56 \
+            0x49FE3B2731090b93d297D259BD1eFFC5DB015edF)")"
+```
+
+</details>
 
 The rebirth replaced every key and redeployed from scratch; see
 `pigfox2-repos/KEYS.md` for the role table and the full retired list.
