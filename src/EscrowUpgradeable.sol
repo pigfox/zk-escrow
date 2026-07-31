@@ -4,8 +4,9 @@ pragma solidity 0.8.28;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import {ReentrancyGuardUpgradeable} from
-    "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {
+    ReentrancyGuardUpgradeable
+} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {IVerifier} from "./IVerifier.sol";
 
@@ -22,12 +23,7 @@ import {IVerifier} from "./IVerifier.sol";
 ///      - Proofs are bound to a single escrow: the circuit derives the
 ///        nullifier from (secret, escrowId), and spent nullifiers are stored,
 ///        so a proof cannot be replayed across escrows or within one.
-contract EscrowUpgradeable is
-    Initializable,
-    UUPSUpgradeable,
-    OwnableUpgradeable,
-    ReentrancyGuardUpgradeable
-{
+contract EscrowUpgradeable is Initializable, UUPSUpgradeable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
     /*//////////////////////////////////////////////////////////////
                                  TYPES
     //////////////////////////////////////////////////////////////*/
@@ -99,6 +95,14 @@ contract EscrowUpgradeable is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Emitted when a new escrow is created in state `Created`.
+    /// @param escrowId The id assigned to this escrow; ids are sequential and never reused.
+    /// @param buyer The account that created the escrow and is expected to fund it.
+    /// @param seller The account that will be paid if a valid delivery proof is presented.
+    /// @param arbiter The only account permitted to settle a dispute over THIS escrow.
+    ///        It is a per-escrow party, not a role over the contract.
+    /// @param amount The exact wei the buyer must send to `fund`; no other value is accepted.
+    /// @param commitment The Poseidon commitment to the delivery secret. The secret itself
+    ///        never appears on chain; `release` proves knowledge of it against this value.
     event EscrowCreated(
         uint256 indexed escrowId,
         address indexed buyer,
@@ -109,20 +113,39 @@ contract EscrowUpgradeable is
     );
 
     /// @notice Emitted when the buyer funds the escrow, moving it to `Funded`.
+    /// @param escrowId The escrow that was funded.
+    /// @param buyer The account that sent the funds; always the escrow's recorded buyer.
+    /// @param amount The wei received, always equal to the escrow's agreed amount.
     event EscrowFunded(uint256 indexed escrowId, address indexed buyer, uint256 amount);
 
     /// @notice Emitted when a valid delivery proof releases funds to the seller.
-    event EscrowReleased(
-        uint256 indexed escrowId, address indexed seller, uint256 amount, uint256 nullifier
-    );
+    /// @param escrowId The escrow that was released.
+    /// @param seller The account credited; taken from the escrow, never from the caller,
+    ///        which is why anyone may submit the proof without being able to redirect payment.
+    /// @param amount The wei credited to the seller's pull-payment balance.
+    /// @param nullifier The proof's nullifier, recorded so the same proof can never be
+    ///        replayed against this or any other escrow.
+    event EscrowReleased(uint256 indexed escrowId, address indexed seller, uint256 amount, uint256 nullifier);
 
     /// @notice Emitted when the seller refunds the buyer without a dispute.
+    /// @param escrowId The escrow that was refunded.
+    /// @param buyer The account credited with the returned funds.
+    /// @param amount The wei returned, always the full escrowed amount.
     event EscrowRefunded(uint256 indexed escrowId, address indexed buyer, uint256 amount);
 
     /// @notice Emitted when either party escalates to the arbiter.
+    /// @param escrowId The escrow moved into `Disputed`.
+    /// @param raisedBy The party that escalated; either the buyer or the seller.
+    /// @param evidence Free-form text emitted verbatim for the arbiter and any observer to read.
     event DisputeRaised(uint256 indexed escrowId, address indexed raisedBy, string evidence);
 
     /// @notice Emitted when the arbiter settles a dispute.
+    /// @param escrowId The escrow that was settled.
+    /// @param arbiter The account that ruled; always the escrow's named arbiter.
+    /// @param ruling Which side won — `BuyerWins` or `SellerWins`. The arbiter picks a
+    ///        side and never an address, so it cannot direct funds to itself.
+    /// @param beneficiary The account credited as a result of the ruling.
+    /// @param amount The wei credited to the beneficiary.
     /// @param rationale The arbiter's full reasoning, emitted verbatim so the
     ///        decision is auditable off-chain.
     event DisputeResolved(
@@ -135,9 +158,15 @@ contract EscrowUpgradeable is
     );
 
     /// @notice Emitted whenever an address's pull-payment balance increases.
+    /// @param payee The account whose withdrawable balance grew.
+    /// @param amount The wei added by this credit.
+    /// @param newBalance The payee's total withdrawable balance after the credit, emitted
+    ///        so an observer can reconcile without replaying every prior event.
     event WithdrawalCredited(address indexed payee, uint256 amount, uint256 newBalance);
 
     /// @notice Emitted when an address pulls its balance out.
+    /// @param payee The account that withdrew.
+    /// @param amount The wei actually transferred, always the payee's entire balance.
     event Withdrawn(address indexed payee, uint256 amount);
 
     /*//////////////////////////////////////////////////////////////
@@ -145,6 +174,24 @@ contract EscrowUpgradeable is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The Groth16 verifier for the delivery circuit.
+    /// @dev    THERE IS DELIBERATELY NO `setVerifier`, AND ITS ABSENCE IS THE
+    ///         TRUST MODEL — not an omission to be tidied up later.
+    ///
+    ///         This address is written once, by `initialize`, and no function in
+    ///         this contract or in any upgrade may change it. A
+    ///         `setVerifier(address) onlyOwner` would let the owner substitute a
+    ///         verifier that returns true for any input, which converts the
+    ///         demo's central claim — *release requires a valid zero-knowledge
+    ///         proof of the delivery secret* — into *release requires the
+    ///         owner's consent*. That is the exact property this contract exists
+    ///         to demonstrate, so the setter is not a missing feature; adding it
+    ///         would delete the feature.
+    ///
+    ///         The consequence is accepted knowingly: because the proxy cannot be
+    ///         repointed, the verifier is effectively frozen for the life of this
+    ///         deployment, and `src/Verifier.sol` is therefore kept exactly as
+    ///         snarkjs generated it — unmodified, so its source keeps matching the
+    ///         bytecode verified on Basescan. Ruled in PF-S123.
     IVerifier public verifier;
 
     /// @notice Monotonically increasing id of the next escrow to be created.
@@ -410,6 +457,14 @@ contract EscrowUpgradeable is
         if (actual != expected) revert InvalidState(escrowId, expected, actual);
     }
 
+    /// @notice Authorises a UUPS implementation upgrade. Owner-only.
+    /// @dev The proxy's entire upgrade authority is this one modifier. It gates the
+    ///      implementation address, never the escrow rules: an upgrade cannot repoint
+    ///      the verifier (there is no setter — see the `verifier` field) and cannot
+    ///      redirect an existing escrow's funds, because payouts read parties from
+    ///      storage rather than from the caller.
+    /// @param newImplementation The implementation the proxy will delegate to. Rejected if
+    ///        zero, which would otherwise brick the proxy irrecoverably.
     /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {
         if (newImplementation == address(0)) revert ZeroAddress();

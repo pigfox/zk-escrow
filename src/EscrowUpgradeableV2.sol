@@ -22,6 +22,11 @@ import {EscrowUpgradeable} from "./EscrowUpgradeable.sol";
 ///      upgradeable by the same owner authority.
 contract EscrowUpgradeableV2 is EscrowUpgradeable {
     /// @notice Emitted when the owner rotates a disputed escrow's arbiter.
+    /// @param escrowId The disputed escrow whose arbiter was replaced.
+    /// @param oldArbiter The arbiter being replaced — in the recovery this contract was
+    ///        written for, an address for which no private key existed.
+    /// @param newArbiter The arbiter installed in its place, guaranteed distinct from
+    ///        both the buyer and the seller.
     event ArbiterRotated(uint256 indexed escrowId, address indexed oldArbiter, address indexed newArbiter);
 
     /// @notice Rotates the arbiter of a `Disputed` escrow. Owner-only recovery.

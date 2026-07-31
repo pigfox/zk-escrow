@@ -54,11 +54,12 @@ jobs:
       # exercised end-to-end by real Groth16 proofs in test/ZkRelease.t.sol.
       coverage-exclusions: src/Verifier.sol
 
-      # src/ and script/ still carry pre-existing formatting violations, and
-      # src/Verifier.sol is additionally in foundry.toml's [fmt] ignore so
-      # widening this can never reformat generated output. Widening it is a
-      # one-word change once those are cleaned up.
-      fmt-paths: test
+      # fmt-paths is deliberately ABSENT now, so this repo takes the pipeline
+      # default of `src test script` like every other consuming repo. It used to
+      # be narrowed to `test` because src/ and script/ carried three pre-existing
+      # violations; PF-S123 formatted those three files, so the carve-out is gone
+      # rather than merely documented. src/Verifier.sol remains in foundry.toml's
+      # [fmt] ignore, so widening this can never reformat generated output.
 
   # ---------------------------------------------------------------------------
   # Repo-specific, and deliberately NOT in the shared pipeline: the pipeline

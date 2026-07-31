@@ -36,9 +36,7 @@ contract Deploy is Script {
         Groth16Verifier verifier = new Groth16Verifier();
         EscrowUpgradeable implementation = new EscrowUpgradeable();
 
-        bytes memory initData = abi.encodeCall(
-            EscrowUpgradeable.initialize, (address(verifier), deployer)
-        );
+        bytes memory initData = abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), deployer));
         ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
 
         vm.stopBroadcast();

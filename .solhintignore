@@ -1,0 +1,14 @@
+# src/Verifier.sol is generated verbatim by snarkjs from the proving key. Its
+# identifiers, visibility keywords and inline assembly are not ours to change,
+# and the next circuit build would undo any edit. It is already excluded from
+# forge fmt and forge lint (the `ignore` entries in foundry.toml) and from the
+# coverage gate (`coverage-exclusions` in .github/workflows/ci.yml); this is the
+# same carve-out for the same reason, kept at the site rather than in the shared
+# config, because a shared config naming a path that exists in only some repos is
+# a rule about somebody else's tree.
+#
+# PF-S123 ruled the file stays generated-and-UNMODIFIED — no Ownable, no edits of
+# any kind — so its source keeps matching the bytecode verified on Basescan and
+# the escrow proxy, which holds the verifier address immutably by design, never
+# needs repointing. See the `verifier` field's natspec in src/EscrowUpgradeable.sol.
+src/Verifier.sol

@@ -65,7 +65,8 @@ contract RecoveryDrill is Script {
         Groth16Verifier verifier = new Groth16Verifier();
         EscrowUpgradeable implementation = new EscrowUpgradeable();
         ERC1967Proxy proxy = new ERC1967Proxy(
-            address(implementation), abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), deployer))
+            address(implementation),
+            abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), deployer))
         );
         EscrowUpgradeable escrow = EscrowUpgradeable(address(proxy));
 
@@ -91,14 +92,19 @@ contract RecoveryDrill is Script {
         uint256 sellerBefore = escrow.pendingWithdrawals(seller);
 
         vm.startBroadcast(arbiterKey);
-        escrow.resolveDispute(id, EscrowUpgradeable.Ruling.SellerWins, "recovery drill: delivery evidence accepted");
+        escrow.resolveDispute(
+            id, EscrowUpgradeable.Ruling.SellerWins, "recovery drill: delivery evidence accepted"
+        );
         vm.stopBroadcast();
 
         // === 4. the assertions the retired rotation test used to make =======
         require(
-            escrow.pendingWithdrawals(seller) - sellerBefore == AMOUNT, "drill: seller was not credited the amount"
+            escrow.pendingWithdrawals(seller) - sellerBefore == AMOUNT,
+            "drill: seller was not credited the amount"
         );
-        require(escrow.getEscrow(id).state == EscrowUpgradeable.State.Resolved, "drill: state is not Resolved");
+        require(
+            escrow.getEscrow(id).state == EscrowUpgradeable.State.Resolved, "drill: state is not Resolved"
+        );
 
         console2.log("=== recovery drill PASSED on Base Sepolia ===");
         console2.log("throwaway proxy: ", address(proxy));
