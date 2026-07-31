@@ -736,22 +736,34 @@ published source matches what the tests and fuzzers ran against.
 <details>
 <summary>Reproducing the verification — live addresses</summary>
 
-With an `ETHERSCAN_API_KEY` set in `../.env`:
+**`--verifier etherscan` is not optional.** This repo's `.env` does not define
+`ETHERSCAN_API_KEY`, and without one `forge verify-contract` does not fail — it
+silently falls back to **Sourcify** and reports `Contract successfully verified`.
+Sourcify is not Basescan, and a contract verified only there still shows as
+unverified on the explorer every link in this README points at. That happened in
+PF-S124 and was caught only by reading the output. Pass the flag, and pass a key
+from a repo that has one until this repo's `.env` gains its own.
 
 ```bash
 set -a; source ../.env; set +a
 
 forge verify-contract 0x20B98B460c1252974177215EaDa7A61259Ad5825 \
     src/Verifier.sol:Groth16Verifier \
-    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --verifier etherscan --watch
 
-forge verify-contract 0x36dDB82CCE0AE251d68369C794070a09021D6825 \
+# The LIVE implementation. Superseded implementations stay verified on their own
+# addresses; re-verifying one is never necessary.
+forge verify-contract 0x22c90633D3537B3F4555541F23b4A243F6a91b8A \
     src/EscrowUpgradeable.sol:EscrowUpgradeable \
-    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --verifier etherscan --watch
 
+# The proxy's constructor arguments are a HISTORICAL FACT, fixed when it was
+# deployed, so the implementation named here is the ORIGINAL one and must stay
+# that way even after an upgrade. Substituting the current implementation would
+# make verification fail, because it would no longer match the deploy calldata.
 forge verify-contract 0x4421E53D0dd051159d1a0F03d45554313e3e9774 \
     lib/openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol:ERC1967Proxy \
-    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --watch \
+    --chain-id 84532 --etherscan-api-key "$ETHERSCAN_API_KEY" --verifier etherscan --watch \
     --constructor-args "$(cast abi-encode 'constructor(address,bytes)' \
         0x36dDB82CCE0AE251d68369C794070a09021D6825 \
         "$(cast calldata 'initialize(address,address)' \
