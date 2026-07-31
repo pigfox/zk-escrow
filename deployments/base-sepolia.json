@@ -47,8 +47,11 @@
       "v1": "0x5c3f41dce28afa54f9656377afbf360cc9310fb4",
       "v2": "0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637"
     },
-    "owner": "0x49FE3B2731090b93d297D259BD1eFFC5DB015edF",
-    "arbiter": "0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C",
+    "//owner": "This used to be one field named plainly 'owner' holding the value passed to initialize(), which by then was no longer the owner — a field name asserting a fact it did not carry. Both values below were re-read from chain 84532 on 2026-07-31 (PF-S122): ownerCurrent from owner(), ownerAtInitialize from the OwnershipTransferred(0x0 -> ...) log emitted in the proxy's own deploy tx at block 44339701.",
+    "ownerCurrent": "0x957a8D5FaEbb5D2179ff2Bc79d114AAFBe714931",
+    "ownerAtInitialize": "0x49FE3B2731090b93d297D259BD1eFFC5DB015edF",
+    "//arbiter": "NOT a global role. There is no arbiter() to call: the arbiter is a per-escrow field of the Escrow struct, set at createEscrow and changeable only by the V2 setArbiter(uint256,address). The address below is the arbiter of record rotated into the nine disputed v1 escrows listed under arbiterRotations — it never had authority over the deployment as a whole.",
+    "arbiterOfRecordOnRotatedEscrows": "0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C",
     "upgradeTx": "0x875a9d68b8249575a4ef61de6e1fc457db758ca2182b18604b977db2488c7e63",
     "arbiterRotations": {
       "5": "0xca2740f61accb052d97bfde8bc2210a1ba094b42e66a7e23e30862cbac59f466", "6": "0x3fc9444f2d0ffa23e65f41c48f5bbced184336b9e7f5093ad8de57e8b69a1ca0", "8": "0x4aeca8ae3d7067e5fd429793aca4a5faec3c72c6e8ba155bcc3ec2e7b446fb9f", "10": "0x6f128f8898e3e7c5071e1bc9c063232ebd1bec8ec40a521e5068d02e8aeb204c", "14": "0xe3a219a1a334e67ad9960304d1f618e7a519fb4d5f4a69779e5edb3f675211d7",

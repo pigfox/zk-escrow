@@ -61,9 +61,14 @@ fuzzer output; they held against real traffic.
 
 ---
 
-## Recovery: the V2 arbiter rotation
+## Recovery: the V2 arbiter rotation — on the RETIRED v1 deployment
 
-A later audit of the live deployment found **nine escrows stranded in `Disputed`**
+> Everything in this section happened on the **v1 proxy
+> [`0x8bB2ae77…8A84` (retired)](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84)**,
+> not on the live deployment at the top of this file. The addresses below are v1
+> artifacts and are kept as the record; nothing here reads them.
+
+A later audit of the then-live v1 deployment found **nine escrows stranded in `Disputed`**
 (#5, #6, #8, #10, #14, #15, #16, #20, #22). Every one named the same arbiter — an
 address that, by an earlier design choice, was **address-only: no private key
 existed for it anywhere.** A keyless arbiter can never call `resolveDispute`, so
@@ -105,9 +110,9 @@ repo — and ships as two pieces:
 
 | Step | Address / tx |
 | --- | --- |
-| V2 implementation | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637`](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637#code) |
-| Upgrade (`upgradeToAndCall`) | [`0x875a9d68…`](https://sepolia.basescan.org/tx/0x875a9d68b8249575a4ef61de6e1fc457db758ca2182b18604b977db2488c7e63) |
-| New arbiter | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` |
+| V2 implementation (retired, v1 estate) | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637` (retired)](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637#code) |
+| Upgrade (`upgradeToAndCall`) on the v1 proxy | [`0x875a9d68…` (retired)](https://sepolia.basescan.org/tx/0x875a9d68b8249575a4ef61de6e1fc457db758ca2182b18604b977db2488c7e63) |
+| New arbiter — on nine **v1** escrows only, never a global role | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` (retired, keyless) |
 | Nine rotations | escrows 5, 6, 8, 10, 14, 15, 16, 20, 22 — hashes in [`deployments/base-sepolia.json`](deployments/base-sepolia.json) |
 | Nine settlements | escrows 5, 6, 8, 10, 14, 15, 16, 20, 22 — all `BuyerWins`, tx hashes in [`docs/settlements-2026-07.md`](docs/settlements-2026-07.md) |
 
@@ -845,13 +850,13 @@ rationales remain readable there.
 
 | Contract | v1 address (retired) |
 | --- | --- |
-| Escrow proxy | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84`](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84) |
-| V1 implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4`](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4) |
-| V2 implementation | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637`](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637) |
-| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56`](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56) |
-| Owner (current) | `0x957a8D5FaEbb5D2179ff2Bc79d114AAFBe714931` |
-| Owner at `initialize` | `0x49FE3B2731090b93d297D259BD1eFFC5DB015edF` — later transferred; it is the value in the v1 constructor args below |
-| Arbiter (post-rotation) | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` |
+| Escrow proxy | [`0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84` (retired)](https://sepolia.basescan.org/address/0x8bB2ae77AcE1424a9418f32bb2b2077563eE8A84) |
+| V1 implementation | [`0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4` (retired)](https://sepolia.basescan.org/address/0x5c3F41Dce28aFA54F9656377aFbF360Cc9310Fb4) |
+| V2 implementation | [`0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637` (retired)](https://sepolia.basescan.org/address/0x1cB2207f11baE16d194a9C187a9bE1F0b38a1637) |
+| Verifier | [`0xE6372Ff3083B9fea441204BF5617a5afF02e2D56` (retired)](https://sepolia.basescan.org/address/0xE6372Ff3083B9fea441204BF5617a5afF02e2D56) |
+| Owner (current, read from chain) | `0x957a8D5FaEbb5D2179ff2Bc79d114AAFBe714931` — **still owns this proxy and retains UUPS upgrade authority over it** |
+| Owner at `initialize` | `0x49FE3B2731090b93d297D259BD1eFFC5DB015edF` — later transferred; it is the value in the v1 constructor args below, and it holds **no privilege anywhere today** |
+| Arbiter on the nine rotated escrows | `0x6BBc782624B3c604e32Ed8b8C00d273970F67d0C` — a per-escrow field, never a global role; keyless |
 
 Read back from chain: the proxy's ERC-1967 implementation slot holds the V2
 implementation `0x1cB2207f…`, and `owner()` returns `0x957a8D5F…`.
@@ -860,9 +865,9 @@ implementation `0x1cB2207f…`, and `owner()` returns `0x957a8D5F…`.
 
 | Contract | Tx |
 | --- | --- |
-| `Groth16Verifier` | [`0x1381d46a…`](https://sepolia.basescan.org/tx/0x1381d46ab23cab5d5bd45d89189987bd9c3194630bc983d91486e6c3f55ad015) |
-| `EscrowUpgradeable` | [`0xbc5456e6…`](https://sepolia.basescan.org/tx/0xbc5456e64bc7a6780b0abc57f185105a9c0a760a6b8ea4f6498b1880e684bc03) |
-| `ERC1967Proxy` | [`0xb4d8bcb6…`](https://sepolia.basescan.org/tx/0xb4d8bcb62bc1a6998d274a3816b28985ef75b6cb0d27fc9678635c02346169cd) |
+| `Groth16Verifier` | [`0x1381d46a…` (retired)](https://sepolia.basescan.org/tx/0x1381d46ab23cab5d5bd45d89189987bd9c3194630bc983d91486e6c3f55ad015) |
+| `EscrowUpgradeable` | [`0xbc5456e6…` (retired)](https://sepolia.basescan.org/tx/0xbc5456e64bc7a6780b0abc57f185105a9c0a760a6b8ea4f6498b1880e684bc03) |
+| `ERC1967Proxy` | [`0xb4d8bcb6…` (retired)](https://sepolia.basescan.org/tx/0xb4d8bcb62bc1a6998d274a3816b28985ef75b6cb0d27fc9678635c02346169cd) — block 44339701, whose `OwnershipTransferred(0x0 → …)` log is the chain source for "Owner at `initialize`" above |
 
 All three succeeded (receipt status `0x1`), for a total of 0.0000139929 ETH in gas.
 
