@@ -28,12 +28,24 @@ winner but can never pay itself.
 | Contract | Address |
 | --- | --- |
 | **Proxy** ← interact with this | [`0x4421E53D0dd051159d1a0F03d45554313e3e9774`](https://sepolia.basescan.org/address/0x4421E53D0dd051159d1a0F03d45554313e3e9774#code) |
-| Implementation — V1 | [`0x36dDB82CCE0AE251d68369C794070a09021D6825`](https://sepolia.basescan.org/address/0x36dDB82CCE0AE251d68369C794070a09021D6825#code) |
+| Implementation — **live** | [`0x22c90633D3537B3F4555541F23b4A243F6a91b8A`](https://sepolia.basescan.org/address/0x22c90633D3537B3F4555541F23b4A243F6a91b8A#code) |
+| Implementation — superseded | [`0x36dDB82CCE0AE251d68369C794070a09021D6825`](https://sepolia.basescan.org/address/0x36dDB82CCE0AE251d68369C794070a09021D6825#code) |
 | Verifier | [`0x20B98B460c1252974177215EaDa7A61259Ad5825`](https://sepolia.basescan.org/address/0x20B98B460c1252974177215EaDa7A61259Ad5825#code) |
 | Owner | `0xb6c3a56CA2f99e3F5d7d16ad968df9f71cCC184D` |
 
 All verified on BaseScan. Chain id 84532. Deployed **2026-07-26**, fresh, then
-seeded with the two acts this repo exists to demonstrate:
+seeded with the two acts this repo exists to demonstrate.
+
+The implementation was **upgraded on 2026-07-31** (PF-S124) after natspec was
+added to `EscrowUpgradeable`. The proxy address did not change and neither did
+anything it holds: all 14 escrows, the settlement history and the spent-nullifier
+set are exactly where they were. That is what the proxy is for — a source change
+that alters no storage layout and no behaviour is an upgrade, never a
+redeployment. `upgradeToAndCall` was called with empty calldata, since there is no
+reinitializer to run. Rehearsed first on throwaway contracts with
+`script/RecoveryDrill.s.sol`, and read back afterwards: implementation slot
+holds the new address, `nextEscrowId` is still 14, owner and verifier unchanged,
+escrow 0 still `Released` and escrow 1 still `Resolved`.
 
 | Escrow | Act | Outcome |
 | --- | --- | --- |
