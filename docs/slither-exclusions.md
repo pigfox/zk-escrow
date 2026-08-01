@@ -50,3 +50,25 @@ a `false` reverts with `TransferFailed`.
 `echidna_balance_equals_obligations` is the standing invariant over the payout
 path: the contract's ETH balance always equals what it still owes, with both
 halves recomputed independently of the contract's own bookkeeping.
+
+## The fuzz exclusion: `src/Verifier.sol`
+
+Separate from Slither, which **does** analyse it, and separate from the coverage
+gate, which excludes it by name: `src/Verifier.sol` is **not driven by Echidna or
+Medusa**. `test/Properties.sol` substitutes `test/mocks/MockVerifier.sol`, so the
+engines can reach the settlement paths behind verification instead of spending an
+entire campaign being rejected — a valid Groth16 proof is not something a fuzzer
+can produce, so pointing the engines at the real verifier would make every
+settlement path unreachable.
+
+That substitution was undocumented until PF-S134. An exclusion nobody argued in
+writing is indistinguishable from one nobody noticed, which is the same standard
+this document applies to every detector above. The shared reasoning, and a table
+of exactly which tools do and do not reach the file, is in the pipeline's
+[`docs/PROPERTIES.md`](https://github.com/pigfox/solidity-pipeline/blob/main/docs/PROPERTIES.md).
+
+What holds it up **in this repo** is `test/ZkRelease.t.sol`, which drives the
+real verifier with real proofs end to end: the accepting case, out-of-range
+public signals at each `checkField` call site, an off-curve point, a zero proof,
+tampered signals, cross-escrow replay, and the settlement-path revert. Without
+those the exclusion would be undefended rather than documented.
