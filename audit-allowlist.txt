@@ -1,0 +1,23 @@
+# audit-allowlist.txt — 64-hex values in audit/ that are PUBLIC BY CONSTRUCTION.
+#
+# A keccak hash and a private key are both uniform 32-byte values, so nothing
+# about their shape separates them. `forge test -vvvv` traces are full of the
+# former. Rather than weaken the secret scan or exempt test.log — the one file a
+# leaked key would most likely land in — each public value is listed here BY VALUE
+# with the reason it is public. Anything not listed still fails the scan.
+#
+# Every entry below was classified by hand in PF-S125. Adding one is a claim that
+# a specific value is public, and it is reviewed like any other suppression.
+
+# The ERC-1967 implementation slot: keccak256("eip1967.proxy.implementation") - 1.
+# A standardised constant published in the EIP itself, read by every UUPS proxy in
+# existence. It appears in these traces because the upgrade tests read the slot
+# directly via VM::load to prove where the proxy points.
+360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc
+
+# Event topic hashes — keccak256 of an event's signature string. Public by
+# definition: any indexer computes them from the ABI, and they are how logs are
+# filtered. These two appear in decoded log tuples in the dispute and settlement
+# tests.
+335ec00177f14d116df2d9836dfb84e01159f61d1d9305a2130432fb47806ae4
+8c54e7f984ddda5c752a2642c92fd42fedef3ac6c19464a7ff09dd64073e3f8e
