@@ -1,11 +1,12 @@
 === /home/peter/Documents/pigfox2-repos/zk-escrow/lib/solidity-pipeline/scripts/coverage.sh --exclude src/Verifier.sol ===
 === captured by lib/solidity-pipeline/scripts/audit-logs.sh, non-TTY, full verbosity ===
+=== provenance: no-key ===
 
 [1;34m==>[0m Running forge coverage in /home/peter/Documents/pigfox2-repos/zk-escrow
 Warning: optimizer settings and `viaIR` have been disabled for accurate coverage reports.
 If you encounter "stack too deep" errors, consider using `--ir-minimum` which enables `viaIR` with minimum optimization resolving most of the errors
 Compiling 60 files with Solc 0.8.28
-Solc 0.8.28 finished in 6.53s
+Solc 0.8.28 finished in 6.25s
 Compiler run successful with warnings:
 Warning (2018): Function state mutability can be restricted to view
    --> src/EscrowUpgradeable.sol:469:5:
@@ -16,6 +17,14 @@ Warning (2018): Function state mutability can be restricted to view
 Analysing contracts...
 Running tests...
 
+Ran 5 tests for test/RecoveryDrill.t.sol:RecoveryDrillTest
+[PASS] test_drill_buyerWins() (gas: 3291269)
+[PASS] test_drill_sellerWins() (gas: 3298109)
+[PASS] test_setArbiter_onlyOwner() (gas: 3200092)
+[PASS] test_staleArbiterCannotResolveAfterRotation() (gas: 3209181)
+[PASS] test_v1HasNoSetArbiter() (gas: 211954)
+Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 15.83ms (12.30ms CPU time)
+
 Ran 8 tests for test/Upgrade.t.sol:UpgradeTest
 [PASS] test_Upgrade_ByOwnerSucceeds() (gas: 3112501)
 [PASS] test_Upgrade_OwnershipTransferGatesFutureUpgrades() (gas: 3124819)
@@ -25,49 +34,36 @@ Ran 8 tests for test/Upgrade.t.sol:UpgradeTest
 [PASS] test_Upgrade_RevertsOnNonContractImplementation() (gas: 24886)
 [PASS] test_Upgrade_RevertsOnZeroImplementation() (gas: 20118)
 [PASS] test_Upgrade_RevertsWhenCalledOnImplementation() (gas: 5875065)
-Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 20.08ms (16.56ms CPU time)
-
-Ran 5 tests for test/RecoveryDrill.t.sol:RecoveryDrillTest
-[PASS] test_drill_buyerWins() (gas: 3291269)
-[PASS] test_drill_sellerWins() (gas: 3298109)
-[PASS] test_setArbiter_onlyOwner() (gas: 3200092)
-[PASS] test_staleArbiterCannotResolveAfterRotation() (gas: 3209181)
-[PASS] test_v1HasNoSetArbiter() (gas: 211954)
-Suite result: ok. 5 passed; 0 failed; 0 skipped; finished in 26.60ms (18.30ms CPU time)
-
-Ran 15 tests for test/ZkRelease.t.sol:ZkReleaseTest
-[PASS] test_Fixtures_ShareCommitmentButNotNullifier() (gas: 19335)
-[PASS] test_Release_EachProofSettlesExactlyItsOwnEscrow() (gas: 925846)
-[PASS] test_Release_RejectsGarbageProof() (gas: 1008183280)
-[PASS] test_Release_RejectsMismatchedNullifier() (gas: 434356)
-[PASS] test_Release_RejectsProofAgainstWrongCommitment() (gas: 434399)
-[PASS] test_Release_RejectsProofFromAnotherEscrow() (gas: 434192)
-[PASS] test_Release_RevertsOnOutOfRangeNullifier() (gas: 230427)
-[PASS] test_Release_WithRealProof() (gas: 516853)
-[PASS] test_Verifier_AcceptsFixtureProof() (gas: 240424)
-[PASS] test_Verifier_RejectsOffCurvePoint() (gas: 1040434188)
-[PASS] test_Verifier_RejectsOutOfRangeCommitment() (gas: 36925)
-[PASS] test_Verifier_RejectsOutOfRangeEscrowId() (gas: 36781)
-[PASS] test_Verifier_RejectsOutOfRangeNullifier() (gas: 36615)
-[PASS] test_Verifier_RejectsTamperedPublicSignals() (gas: 240608)
-[PASS] test_Verifier_RejectsZeroProof() (gas: 222895)
-Suite result: ok. 15 passed; 0 failed; 0 skipped; finished in 109.80ms (133.38ms CPU time)
+Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 42.94ms (35.46ms CPU time)
 
 Ran 13 tests for test/PropertiesHarness.t.sol:PropertiesHarnessTest
-[PASS] test_Harness_EverySettlementRegistersAnOpportunity() (gas: 1328905)
-[PASS] test_Harness_FailedProofIsNotASettlementOpportunity() (gas: 527303)
-[PASS] test_Harness_FailedProofLeavesEscrowFunded() (gas: 520983)
-[PASS] test_Harness_NoOpsWhenNoEscrows() (gas: 244510)
-[PASS] test_Harness_ReachesRefunded() (gas: 595407)
-[PASS] test_Harness_ReachesReleased() (gas: 657621)
-[PASS] test_Harness_ReachesResolvedForBuyer() (gas: 677384)
-[PASS] test_Harness_ReachesResolvedForSeller() (gas: 649739)
-[PASS] test_Harness_SameAddressBuyerAndSellerAcrossEscrows() (gas: 1115399)
-[PASS] test_Harness_SpentNullifierCannotReleaseSecondEscrow() (gas: 948302)
-[PASS] test_Harness_UnauthorizedResolveIsRejected() (gas: 520311)
-[PASS] test_Harness_UniformFundOnTerminalEscrowIsRejected() (gas: 723671)
-[PASS] test_Harness_WithdrawDrainsCredits() (gas: 667492)
-Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 153.92ms (150.76ms CPU time)
+[PASS] test_Harness_EverySettlementRegistersAnOpportunity() (gas: 1328358)
+[PASS] test_Harness_FailedProofIsNotASettlementOpportunity() (gas: 527393)
+[PASS] test_Harness_FailedProofLeavesEscrowFunded() (gas: 521139)
+[PASS] test_Harness_NoOpsWhenNoEscrows() (gas: 244579)
+[PASS] test_Harness_ReachesRefunded() (gas: 595694)
+[PASS] test_Harness_ReachesReleased() (gas: 658041)
+[PASS] test_Harness_ReachesResolvedForBuyer() (gas: 677606)
+[PASS] test_Harness_ReachesResolvedForSeller() (gas: 649917)
+[PASS] test_Harness_SameAddressBuyerAndSellerAcrossEscrows() (gas: 1115555)
+[PASS] test_Harness_SpentNullifierCannotReleaseSecondEscrow() (gas: 948810)
+[PASS] test_Harness_UnauthorizedResolveIsRejected() (gas: 520290)
+[PASS] test_Harness_UniformFundOnTerminalEscrowIsRejected() (gas: 723805)
+[PASS] test_Harness_WithdrawDrainsCredits() (gas: 667582)
+Suite result: ok. 13 passed; 0 failed; 0 skipped; finished in 81.47ms (77.36ms CPU time)
+
+Ran 10 tests for test/SetArbiter.t.sol:SetArbiterTest
+[PASS] testFuzz_SetArbiter_NeverMovesFunds(address) (runs: 512, μ: 239593, ~: 239593)
+[PASS] testFuzz_SetArbiter_OnlyOwnerCanRotate(address) (runs: 512, μ: 217241, ~: 217241)
+[PASS] test_SetArbiter_RevertsForNonOwner() (gas: 209705)
+[PASS] test_SetArbiter_RevertsForNonexistentEscrow() (gas: 24563)
+[PASS] test_SetArbiter_RevertsOnZeroArbiter() (gas: 207022)
+[PASS] test_SetArbiter_RevertsWhenNewArbiterIsBuyer() (gas: 207375)
+[PASS] test_SetArbiter_RevertsWhenNewArbiterIsSeller() (gas: 207540)
+[PASS] test_SetArbiter_RevertsWhenNotDisputed() (gas: 204843)
+[PASS] test_SetArbiter_RotatedArbiterCanSettle() (gas: 284002)
+[PASS] test_SetArbiter_RotatesDisputedEscrow() (gas: 237200)
+Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 1.05s (1.06s CPU time)
 
 Ran 61 tests for test/EscrowUpgradeable.t.sol:EscrowUpgradeableTest
 [PASS] testFuzz_CreateEscrow_RejectsNonParties(address) (runs: 512, μ: 189585, ~: 189595)
@@ -131,20 +127,25 @@ Ran 61 tests for test/EscrowUpgradeable.t.sol:EscrowUpgradeableTest
 [PASS] test_Withdraw_RevertsWhenRecipientRejectsEth() (gas: 1079108)
 [PASS] test_Withdraw_RevertsWithNothingPending() (gas: 24372)
 [PASS] test_Withdraw_Succeeds() (gas: 313477)
-Suite result: ok. 61 passed; 0 failed; 0 skipped; finished in 1.02s (1.19s CPU time)
+Suite result: ok. 61 passed; 0 failed; 0 skipped; finished in 23.05s (1.19s CPU time)
 
-Ran 10 tests for test/SetArbiter.t.sol:SetArbiterTest
-[PASS] testFuzz_SetArbiter_NeverMovesFunds(address) (runs: 512, μ: 239593, ~: 239593)
-[PASS] testFuzz_SetArbiter_OnlyOwnerCanRotate(address) (runs: 512, μ: 217241, ~: 217241)
-[PASS] test_SetArbiter_RevertsForNonOwner() (gas: 209705)
-[PASS] test_SetArbiter_RevertsForNonexistentEscrow() (gas: 24563)
-[PASS] test_SetArbiter_RevertsOnZeroArbiter() (gas: 207022)
-[PASS] test_SetArbiter_RevertsWhenNewArbiterIsBuyer() (gas: 207375)
-[PASS] test_SetArbiter_RevertsWhenNewArbiterIsSeller() (gas: 207540)
-[PASS] test_SetArbiter_RevertsWhenNotDisputed() (gas: 204843)
-[PASS] test_SetArbiter_RotatedArbiterCanSettle() (gas: 284002)
-[PASS] test_SetArbiter_RotatesDisputedEscrow() (gas: 237200)
-Suite result: ok. 10 passed; 0 failed; 0 skipped; finished in 23.28s (1.14s CPU time)
+Ran 15 tests for test/ZkRelease.t.sol:ZkReleaseTest
+[PASS] test_Fixtures_ShareCommitmentButNotNullifier() (gas: 19335)
+[PASS] test_Release_EachProofSettlesExactlyItsOwnEscrow() (gas: 925846)
+[PASS] test_Release_RejectsGarbageProof() (gas: 1008183280)
+[PASS] test_Release_RejectsMismatchedNullifier() (gas: 434356)
+[PASS] test_Release_RejectsProofAgainstWrongCommitment() (gas: 434399)
+[PASS] test_Release_RejectsProofFromAnotherEscrow() (gas: 434192)
+[PASS] test_Release_RevertsOnOutOfRangeNullifier() (gas: 230427)
+[PASS] test_Release_WithRealProof() (gas: 516853)
+[PASS] test_Verifier_AcceptsFixtureProof() (gas: 240424)
+[PASS] test_Verifier_RejectsOffCurvePoint() (gas: 1040434188)
+[PASS] test_Verifier_RejectsOutOfRangeCommitment() (gas: 36925)
+[PASS] test_Verifier_RejectsOutOfRangeEscrowId() (gas: 36781)
+[PASS] test_Verifier_RejectsOutOfRangeNullifier() (gas: 36615)
+[PASS] test_Verifier_RejectsTamperedPublicSignals() (gas: 240608)
+[PASS] test_Verifier_RejectsZeroProof() (gas: 222895)
+Suite result: ok. 15 passed; 0 failed; 0 skipped; finished in 24.90s (161.00ms CPU time)
 
 Ran 2 tests for test/SetArbiterInvariant.t.sol:SetArbiterInvariantTest
 [PASS] invariant_OnlyOwnerCanRotate() (runs: 256, calls: 16384, reverts: 0)
@@ -167,9 +168,9 @@ Ran 2 tests for test/SetArbiterInvariant.t.sol:SetArbiterInvariantTest
 | SetArbiterHandler | rotateAsOwner    | 8183  | 0       | 0        |
 ╰-------------------+------------------+-------+---------+----------╯
 
-Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 23.71s (46.38s CPU time)
+Suite result: ok. 2 passed; 0 failed; 0 skipped; finished in 44.63s (43.21s CPU time)
 
-Ran 8 tests for test/Invariants.t.sol:InvariantsTest
+Ran 9 tests for test/Invariants.t.sol:InvariantsTest
 [PASS] invariant_ArbiterNeverCredited() (runs: 256, calls: 16384, reverts: 0)
 
 ╭------------+----------------------------+-------+---------+----------╮
@@ -300,6 +301,32 @@ Ran 8 tests for test/Invariants.t.sol:InvariantsTest
 | Properties | withdraw                   | 851   | 0       | 0        |
 ╰------------+----------------------------+-------+---------+----------╯
 
+[PASS] invariant_RotationRespectsItsGuards() (runs: 256, calls: 16384, reverts: 0)
+
+╭------------+----------------------------+-------+---------+----------╮
+| Contract   | Selector                   | Calls | Reverts | Discards |
++======================================================================+
+| Properties | createEscrow               | 2732  | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | fund                       | 2732  | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | raiseDispute               | 1792  | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | refund                     | 1958  | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | release                    | 1780  | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | resolveDispute             | 1833  | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | resolveDisputeUnauthorized | 897   | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | setVerifierVerdict         | 901   | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | submitEvidence             | 908   | 0       | 0        |
+|------------+----------------------------+-------+---------+----------|
+| Properties | withdraw                   | 851   | 0       | 0        |
+╰------------+----------------------------+-------+---------+----------╯
+
 [PASS] invariant_StateMachineValid() (runs: 256, calls: 16384, reverts: 0)
 
 ╭------------+----------------------------+-------+---------+----------╮
@@ -326,11 +353,11 @@ Ran 8 tests for test/Invariants.t.sol:InvariantsTest
 | Properties | withdraw                   | 851   | 0       | 0        |
 ╰------------+----------------------------+-------+---------+----------╯
 
-[PASS] test_declaredPropertyCountMatchesThisFile() (gas: 92447)
-[PASS] test_harnessSaysWhatItProves() (gas: 10347)
-Suite result: ok. 8 passed; 0 failed; 0 skipped; finished in 45.02s (168.71s CPU time)
+[PASS] test_declaredPropertyCountMatchesThisFile() (gas: 94065)
+[PASS] test_harnessSaysWhatItProves() (gas: 10518)
+Suite result: ok. 9 passed; 0 failed; 0 skipped; finished in 47.36s (188.45s CPU time)
 
-Ran 8 test suites in 45.02s (93.34s CPU time): 122 tests passed, 0 failed, 0 skipped (122 total tests)
+Ran 8 test suites in 47.36s (141.13s CPU time): 123 tests passed, 0 failed, 0 skipped (123 total tests)
 
 ╭-----------------------------+------------------+-------------------+-----------------+-----------------╮
 | File                        | % Lines          | % Statements      | % Branches      | % Funcs         |

@@ -1,5 +1,6 @@
 === slither . --ignore-compile --config-file /home/peter/Documents/pigfox2-repos/zk-escrow/lib/solidity-pipeline/scripts/../slither.config.json ===
 === captured by lib/solidity-pipeline/scripts/audit-logs.sh, non-TTY, full verbosity ===
+=== provenance: no-key ===
 
 --ignore-compile used, if something goes wrong, consider removing the ignore compile flag
 INFO:Slither:. analyzed (68 contracts with 90 detectors), 0 result(s) found

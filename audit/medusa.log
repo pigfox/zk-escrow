@@ -1,40 +1,42 @@
 === medusa fuzz --config medusa.json ===
 === captured by lib/solidity-pipeline/scripts/audit-logs.sh, non-TTY, full verbosity ===
+=== provenance: no-key ===
 
 [1m[32m⇾[0m[0m [1mReading the configuration file at: [1mmedusa.json[0m[0m
 [1m[32m⇾[0m[0m [1mCompiling targets with [1mcrytic-compile[0m[0m
 [1m[32m⇾[0m[0m [1mRunning command:
 /home/peter/.local/bin/crytic-compile . --export-format solc --foundry-ignore-compile[0m
-[1m[32m⇾[0m[0m [1mFinished compiling targets in 6s[0m
-[1m[33mwarn[0m[0m [1m[1martifacts: [0mMedusa is running against the [1m[33msame[0m[0m build artifacts as previously (last run: 9 minutes ago)[0m
+[1m[32m⇾[0m[0m [1mFinished compiling targets in 5s[0m
+[1m[33mwarn[0m[0m [1m[1martifacts: [0mMedusa is running against the [1m[33msame[0m[0m build artifacts as previously (last run: 41 minutes ago)[0m
 [1m[32m⇾[0m[0m [1mUsing cached Slither results found at slither_results.json[0m
 [1m[32m⇾[0m[0m [1mSetting up test chain[0m
 [1m[32m⇾[0m[0m [1mFinished setting up test chain[0m
 [1m[32m⇾[0m[0m [1mCreating corpus...[0m
 [1m[32m⇾[0m[0m [1mInitializing corpus...[0m
 [1m[32m⇾[0m[0m [1mFuzzing with [1m8[0m workers[0m
-[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_obligations_never_exceed_funded()[0m[0m
-[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_arbiter_never_credited()[0m[0m
-[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_nullifier_never_reused()[0m[0m
-[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_balance_equals_obligations()[0m[0m
-[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_ledger_consistent()[0m[0m
 [1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_state_machine_valid()[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      0s[0m, calls: [1m         0 (     0/sec)[0m, seq/s: [1m     0[0m, branches: [1m   136[0m, corpus: [1m    0[0m, failures: [1m0/0[0m, gas/s: [1m           0[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      3s[0m, calls: [1m      5965 (  1983/sec)[0m, seq/s: [1m    50[0m, branches: [1m  1145[0m, corpus: [1m   75[0m, failures: [1m0/153[0m, gas/s: [1m   163650973[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      6s[0m, calls: [1m     13611 (  2534/sec)[0m, seq/s: [1m    39[0m, branches: [1m  1154[0m, corpus: [1m   77[0m, failures: [1m0/272[0m, gas/s: [1m   205818746[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      9s[0m, calls: [1m     21261 (  2544/sec)[0m, seq/s: [1m    39[0m, branches: [1m  1161[0m, corpus: [1m   78[0m, failures: [1m0/391[0m, gas/s: [1m   212438874[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     12s[0m, calls: [1m     28449 (  2391/sec)[0m, seq/s: [1m    37[0m, branches: [1m  1164[0m, corpus: [1m   79[0m, failures: [1m0/505[0m, gas/s: [1m   194697244[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     15s[0m, calls: [1m     36641 (  2725/sec)[0m, seq/s: [1m    42[0m, branches: [1m  1164[0m, corpus: [1m   79[0m, failures: [1m0/632[0m, gas/s: [1m   220599136[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     18s[0m, calls: [1m     44079 (  2476/sec)[0m, seq/s: [1m    38[0m, branches: [1m  1164[0m, corpus: [1m   79[0m, failures: [1m0/749[0m, gas/s: [1m   205319046[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     21s[0m, calls: [1m     51948 (  2619/sec)[0m, seq/s: [1m    40[0m, branches: [1m  1164[0m, corpus: [1m   79[0m, failures: [1m0/871[0m, gas/s: [1m   214758511[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     24s[0m, calls: [1m     59621 (  2557/sec)[0m, seq/s: [1m    40[0m, branches: [1m  1164[0m, corpus: [1m   79[0m, failures: [1m0/994[0m, gas/s: [1m   207516431[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     27s[0m, calls: [1m     67442 (  2597/sec)[0m, seq/s: [1m    40[0m, branches: [1m  1164[0m, corpus: [1m   79[0m, failures: [1m0/1115[0m, gas/s: [1m   204587843[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     30s[0m, calls: [1m     74416 (  2323/sec)[0m, seq/s: [1m    35[0m, branches: [1m  1167[0m, corpus: [1m   80[0m, failures: [1m0/1223[0m, gas/s: [1m   187638005[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     33s[0m, calls: [1m     81484 (  2277/sec)[0m, seq/s: [1m    35[0m, branches: [1m  1167[0m, corpus: [1m   80[0m, failures: [1m0/1333[0m, gas/s: [1m   177893107[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     36s[0m, calls: [1m     87426 (  1965/sec)[0m, seq/s: [1m    30[0m, branches: [1m  1167[0m, corpus: [1m   80[0m, failures: [1m0/1425[0m, gas/s: [1m   153597594[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     39s[0m, calls: [1m     92322 (  1627/sec)[0m, seq/s: [1m    25[0m, branches: [1m  1172[0m, corpus: [1m   82[0m, failures: [1m0/1503[0m, gas/s: [1m   130536674[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     42s[0m, calls: [1m     96597 (  1417/sec)[0m, seq/s: [1m    21[0m, branches: [1m  1172[0m, corpus: [1m   82[0m, failures: [1m0/1569[0m, gas/s: [1m   113742785[0m[0m
-[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     45s[0m, calls: [1m    102431 (  1939/sec)[0m, seq/s: [1m    30[0m, branches: [1m  1172[0m, corpus: [1m   82[0m, failures: [1m0/1662[0m, gas/s: [1m   154116676[0m[0m
+[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_ledger_consistent()[0m[0m
+[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_obligations_never_exceed_funded()[0m[0m
+[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_rotation_respects_its_guards()[0m[0m
+[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_balance_equals_obligations()[0m[0m
+[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_nullifier_never_reused()[0m[0m
+[1m[32m⇾[0m[0m [1m[1m[32m[NOT STARTED] [0m[0m[1mProperty Test: Properties.echidna_arbiter_never_credited()[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      0s[0m, calls: [1m         0 (     0/sec)[0m, seq/s: [1m     0[0m, branches: [1m   132[0m, corpus: [1m    0[0m, failures: [1m0/0[0m, gas/s: [1m           0[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      3s[0m, calls: [1m      7110 (  2369/sec)[0m, seq/s: [1m    61[0m, branches: [1m  1259[0m, corpus: [1m   87[0m, failures: [1m0/186[0m, gas/s: [1m   189903223[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      6s[0m, calls: [1m     14564 (  2484/sec)[0m, seq/s: [1m    38[0m, branches: [1m  1266[0m, corpus: [1m   90[0m, failures: [1m0/302[0m, gas/s: [1m   200435315[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m      9s[0m, calls: [1m     22351 (  2590/sec)[0m, seq/s: [1m    40[0m, branches: [1m  1266[0m, corpus: [1m   90[0m, failures: [1m0/425[0m, gas/s: [1m   210038420[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     12s[0m, calls: [1m     29950 (  2527/sec)[0m, seq/s: [1m    39[0m, branches: [1m  1272[0m, corpus: [1m   92[0m, failures: [1m0/544[0m, gas/s: [1m   205910101[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     15s[0m, calls: [1m     35896 (  1980/sec)[0m, seq/s: [1m    30[0m, branches: [1m  1272[0m, corpus: [1m   92[0m, failures: [1m0/636[0m, gas/s: [1m   165325663[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     18s[0m, calls: [1m     43358 (  2420/sec)[0m, seq/s: [1m    37[0m, branches: [1m  1275[0m, corpus: [1m   93[0m, failures: [1m0/752[0m, gas/s: [1m   198476731[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     21s[0m, calls: [1m     50465 (  2325/sec)[0m, seq/s: [1m    36[0m, branches: [1m  1278[0m, corpus: [1m   94[0m, failures: [1m0/863[0m, gas/s: [1m   200969285[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     24s[0m, calls: [1m     57346 (  2287/sec)[0m, seq/s: [1m    36[0m, branches: [1m  1278[0m, corpus: [1m   94[0m, failures: [1m0/972[0m, gas/s: [1m   194573998[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     27s[0m, calls: [1m     63893 (  2145/sec)[0m, seq/s: [1m    33[0m, branches: [1m  1278[0m, corpus: [1m   94[0m, failures: [1m0/1073[0m, gas/s: [1m   178640632[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     30s[0m, calls: [1m     70070 (  2045/sec)[0m, seq/s: [1m    31[0m, branches: [1m  1278[0m, corpus: [1m   94[0m, failures: [1m0/1169[0m, gas/s: [1m   168186255[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     33s[0m, calls: [1m     75852 (  1926/sec)[0m, seq/s: [1m    30[0m, branches: [1m  1278[0m, corpus: [1m   94[0m, failures: [1m0/1260[0m, gas/s: [1m   161046676[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     36s[0m, calls: [1m     82241 (  2123/sec)[0m, seq/s: [1m    33[0m, branches: [1m  1278[0m, corpus: [1m   94[0m, failures: [1m0/1360[0m, gas/s: [1m   179041191[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     39s[0m, calls: [1m     89282 (  2337/sec)[0m, seq/s: [1m    36[0m, branches: [1m  1278[0m, corpus: [1m   94[0m, failures: [1m0/1470[0m, gas/s: [1m   196542942[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     42s[0m, calls: [1m     96412 (  2366/sec)[0m, seq/s: [1m    36[0m, branches: [1m  1280[0m, corpus: [1m   95[0m, failures: [1m0/1580[0m, gas/s: [1m   197185800[0m[0m
+[1m[32m⇾[0m[0m [1m[1mfuzz: [0melapsed: [1m     45s[0m, calls: [1m    102408 (  1989/sec)[0m, seq/s: [1m    31[0m, branches: [1m  1280[0m, corpus: [1m   95[0m, failures: [1m0/1676[0m, gas/s: [1m   169690171[0m[0m
 [1m[32m⇾[0m[0m [1mTransaction test limit reached, halting now...[0m
 [1m[32m⇾[0m[0m [1mFuzzer stopped, test results follow below ...[0m
 [1m[32m⇾[0m[0m [1m[1m[32m[PASSED] [0m[0m[1mProperty Test: Properties.echidna_arbiter_never_credited()[0m[0m
@@ -42,8 +44,9 @@
 [1m[32m⇾[0m[0m [1m[1m[32m[PASSED] [0m[0m[1mProperty Test: Properties.echidna_ledger_consistent()[0m[0m
 [1m[32m⇾[0m[0m [1m[1m[32m[PASSED] [0m[0m[1mProperty Test: Properties.echidna_nullifier_never_reused()[0m[0m
 [1m[32m⇾[0m[0m [1m[1m[32m[PASSED] [0m[0m[1mProperty Test: Properties.echidna_obligations_never_exceed_funded()[0m[0m
+[1m[32m⇾[0m[0m [1m[1m[32m[PASSED] [0m[0m[1mProperty Test: Properties.echidna_rotation_respects_its_guards()[0m[0m
 [1m[32m⇾[0m[0m [1m[1m[32m[PASSED] [0m[0m[1mProperty Test: Properties.echidna_state_machine_valid()[0m[0m
-[1m[32m⇾[0m[0m [1mTest summary: [1m[32m6[0m[0m test(s) passed, [1m[31m0[0m[0m test(s) failed[0m
+[1m[32m⇾[0m[0m [1mTest summary: [1m[32m7[0m[0m test(s) passed, [1m[31m0[0m[0m test(s) failed[0m
 [1m[32m⇾[0m[0m [1mhtml report(s) saved to: medusa-corpus/coverage/coverage_report.html[0m
 [1m[32m⇾[0m[0m [1mlcov report(s) saved to: medusa-corpus/coverage/lcov.info[0m
 
