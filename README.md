@@ -477,7 +477,10 @@ that run in CI are the same bytes you run locally:
 
 ```bash
 git submodule update --init --recursive   # brings in lib/solidity-pipeline
-forge test                  # 105 tests: unit, fuzz, invariants
+lib/solidity-pipeline/scripts/lint-config-check.sh all
+forge lint                  # bare: a path argument overrides `ignore`
+npx --yes solhint@6.2.3 -c lib/solidity-pipeline/.solhint.json --max-warnings 0 'src/**/*.sol'
+forge test                  # unit, fuzz, invariants — count in pipeline-summary.json
 lib/solidity-pipeline/scripts/coverage.sh          # fails below 100% on src/
 lib/solidity-pipeline/scripts/no-chain-copy-gate.sh all
 echidna . --contract Properties --config echidna.yaml       # 6/6, 100k calls
@@ -486,6 +489,26 @@ slither . --ignore-compile --fail-low \
   --config-file lib/solidity-pipeline/slither.config.json   # 0 findings
 cd agent && go test ./... -race -coverprofile=coverage.out
 ```
+
+### Lint is step 1
+
+The pipeline's **first** stage is the two linters, and they are first because
+they are cheapest: no fuzzing, no coverage run and no chain, so a style or
+natspec regression fails in seconds instead of after the fuzzers. `forge lint` is
+Foundry's own and needs no npm; Solhint adds the natspec surface `forge lint`
+does not check and is installed by pinned `npx` at CI time, so this repo gains no
+`package.json`, lockfile or `node_modules` from it.
+
+`forge lint` is invoked **bare**. Passing it a path overrides the `ignore`
+config — which here would lint `src/Verifier.sol`, the snarkjs-generated file
+that config exists to skip. Because `forge lint` has no `--config-file`, the
+`[lint]` block is *copied* into this repo's `foundry.toml` rather than consumed
+from the submodule, and `lib/solidity-pipeline/scripts/lint-config-check.sh`
+fails the build if the copy drifts from the canonical one. Every rule the estate
+turns off is argued in the pipeline's
+[`docs/forge-lint-rules.md`](https://github.com/pigfox/solidity-pipeline/blob/main/docs/forge-lint-rules.md)
+and [`docs/solhint-rules.md`](https://github.com/pigfox/solidity-pipeline/blob/main/docs/solhint-rules.md);
+per-line suppression comments are not used at all.
 
 ### One property contract, three engines
 
