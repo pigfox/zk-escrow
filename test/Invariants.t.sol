@@ -83,6 +83,13 @@ contract InvariantsTest is Test {
     /// @dev Guards the canary itself: `afterInvariant` below only means
     ///      anything while every success is dominated by a registered
     ///      opportunity in the same call frame.
+    function invariant_RotationRespectsItsGuards() public view {
+        assertTrue(
+            properties.echidna_rotation_respects_its_guards(),
+            "an arbiter rotation escaped the guards V2 claims for it"
+        );
+    }
+
     function invariant_LedgerConsistent() public view {
         assertTrue(
             properties.echidna_ledger_consistent(),
@@ -99,7 +106,7 @@ contract InvariantsTest is Test {
     ///      the job reported green on the smaller one; that is the whole reason
     ///      the number is stated in four independent places.
     function test_declaredPropertyCountMatchesThisFile() public view {
-        assertEq(properties.pigfoxPropertyCount(), 6, "declared property count");
+        assertEq(properties.pigfoxPropertyCount(), 7, "declared property count");
         assertEq(
             _predicatesDrivenHere(), properties.pigfoxPropertyCount(), "predicates asserted by this file"
         );
@@ -108,7 +115,7 @@ contract InvariantsTest is Test {
     function test_harnessSaysWhatItProves() public view {
         assertEq(
             properties.pigfoxHarnessDescription(),
-            "escrowed ETH always equals what is owed, an arbiter never profits, and a nullifier spends once"
+            "escrowed ETH always equals what is owed, an arbiter never profits, a nullifier spends once, and an arbiter rotation stays inside its guards"
         );
     }
 
@@ -127,6 +134,8 @@ contract InvariantsTest is Test {
         properties.echidna_nullifier_never_reused();
         n++;
         properties.echidna_ledger_consistent();
+        n++;
+        properties.echidna_rotation_respects_its_guards();
         n++;
     }
 
@@ -158,6 +167,9 @@ contract InvariantsTest is Test {
         }
         if (properties.ghost_fundOpportunities() > 0) {
             assertGt(properties.ghost_funds(), 0, "every fundable escrow failed to fund");
+        }
+        if (properties.ghost_rotationOpportunities() > 0) {
+            assertGt(properties.ghost_rotations(), 0, "every rotatable escrow failed to rotate");
         }
         if (properties.ghost_settleOpportunities() > 0) {
             assertGt(

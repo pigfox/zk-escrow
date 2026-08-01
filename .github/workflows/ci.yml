@@ -36,13 +36,19 @@ jobs:
   pipeline:
     uses: pigfox/solidity-pipeline/.github/workflows/solidity.yml@v1
     with:
-      # test/Properties.sol declares six echidna_* predicates and states the same
+      # test/Properties.sol declares seven echidna_* predicates and states the same
       # number in pigfoxPropertyCount(). Both fuzzers assert they registered
       # exactly this many. That guard exists because of this repo: a stale
       # crytic-export once shrank a five-property set to four and the job passed.
       #
       # Bump this, pigfoxPropertyCount() and the predicate together, in one commit.
-      expected-properties: 6
+      #
+      # Six until PF-S134, which added the arbiter-rotation property. The harness
+      # now runs on an EscrowUpgradeableV2 implementation so setArbiter is
+      # reachable at all — V2 is an append-only delta over V1, so every earlier
+      # predicate still exercises V1's logic verbatim. V2 is NOT the live
+      # implementation; see the note in test/Properties.sol.
+      expected-properties: 7
 
       # src/Verifier.sol is generated verbatim by snarkjs from the proving key.
       # Its residual uncovered lines are the inline-assembly early exits taken

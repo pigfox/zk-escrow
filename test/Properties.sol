@@ -6,6 +6,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {PigfoxProperties} from "pipeline/PigfoxProperties.sol";
 
 import {EscrowUpgradeable} from "../src/EscrowUpgradeable.sol";
+import {EscrowUpgradeableV2} from "../src/EscrowUpgradeableV2.sol";
 import {MockVerifier} from "./mocks/MockVerifier.sol";
 import {Actor} from "./Actor.sol";
 
@@ -33,7 +34,30 @@ contract Properties is PigfoxProperties {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice The escrow under test, behind its proxy.
-    EscrowUpgradeable public escrow;
+    /// @notice The proxy under test, behind an {EscrowUpgradeableV2} implementation.
+    /// @dev    WHY V2 AND NOT V1, AND WHAT THAT DOES *NOT* MEAN.
+    ///
+    ///         V2 is an APPEND-ONLY delta over V1: one owner-only `setArbiter`
+    ///         and its event, no new storage, no reordering, no override of any
+    ///         inherited function. So every predicate below still exercises V1's
+    ///         logic verbatim — nothing was traded away to reach the V2 surface —
+    ///         and `setArbiter` becomes reachable, which it was not before.
+    ///         PF-S133 found V2 in neither fuzzer's property set; this is that.
+    ///
+    ///         IT DOES NOT MEAN V2 IS THE LIVE IMPLEMENTATION. It is NOT. Both
+    ///         implementation addresses behind the live proxy
+    ///         0x4421E53D0dd051159d1a0F03d45554313e3e9774 are
+    ///         `EscrowUpgradeable`, and the `v1`/`v2` keys in
+    ///         deployments/base-sepolia.json denote the implementation
+    ///         GENERATION, not the contract NAME. Verified three ways in PF-S133:
+    ///         both addresses report 7,299 bytes of code on chain while V2 builds
+    ///         to 7,724; Basescan reports ContractName `EscrowUpgradeable` for
+    ///         both; and that file's own `upgrades` entry gives the reason as the
+    ///         natspec pass on `EscrowUpgradeable`. V2 is deployed only on the
+    ///         RETIRED deployment. It is fuzzed here as source that exists in
+    ///         this repo, which is the honest reason, and not because anything
+    ///         on chain runs it today.
+    EscrowUpgradeableV2 public escrow;
 
     /// @notice The mock verifier, so `release` is reachable by the fuzzer.
     MockVerifier public verifier;
@@ -115,6 +139,19 @@ contract Properties is PigfoxProperties {
     ///      the question actually worth asking — "did anything that should have
     ///      worked fail to?" — instead of betting on the selector distribution.
     uint256 public ghost_createAttempts;
+
+    /// @dev Rotations where EVERY on-chain precondition held at the moment of the
+    ///      call — the escrow was `Disputed` and the replacement was a real
+    ///      address that was neither the buyer nor the seller — so `setArbiter`
+    ///      HAD to succeed. The denominator for the rotation canary.
+    uint256 public ghost_rotationOpportunities;
+
+    /// @dev Rotations that actually succeeded. Paired with the counter above so
+    ///      `echidna_rotation_respects_its_guards` cannot pass by never having
+    ///      rotated anything. A predicate that has never been contradicted and
+    ///      one that CANNOT be contradicted look identical in a green run, and
+    ///      this is what separates them for the V2 surface.
+    uint256 public ghost_rotations;
     uint256 public ghost_fundOpportunities;
     uint256 public ghost_settleOpportunities;
 
@@ -135,16 +172,29 @@ contract Properties is PigfoxProperties {
     ///      Checking it here turns that drift into a failing property instead.
     bool public ledgerInconsistent;
 
+    /// @dev Set if {EscrowUpgradeableV2-setArbiter} ever succeeded outside the
+    ///      guards its own natspec claims for it — on an escrow that was not
+    ///      `Disputed`, or installing the buyer, the seller or the zero address —
+    ///      or if it changed anything beyond the arbiter field, or if a REJECTED
+    ///      rotation changed anything at all.
+    ///
+    ///      The distinctness guard is not cosmetic: `resolveDispute` routes funds
+    ///      only to the buyer or the seller, so letting a party become the
+    ///      arbiter is the one rotation that could turn a recovery lever into a
+    ///      way to pay the arbiter. That is why this is checked here rather than
+    ///      left to `echidna_arbiter_never_credited` to notice after the fact.
+    bool public rotationBrokeItsGuards;
+
     /// @dev Starting balance split across the actor pool.
     uint256 internal constant POOL_ENDOWMENT = 1000 ether;
 
     constructor() payable {
         verifier = new MockVerifier();
 
-        EscrowUpgradeable impl = new EscrowUpgradeable();
+        EscrowUpgradeableV2 impl = new EscrowUpgradeableV2();
         bytes memory initData =
             abi.encodeCall(EscrowUpgradeable.initialize, (address(verifier), address(this)));
-        escrow = EscrowUpgradeable(address(new ERC1967Proxy(address(impl), initData)));
+        escrow = EscrowUpgradeableV2(address(new ERC1967Proxy(address(impl), initData)));
 
         // Echidna/Medusa endow this contract at deploy time; Foundry's setUp
         // deals it explicitly. Either way, split the stake across the pool so
@@ -410,6 +460,66 @@ contract Properties is PigfoxProperties {
         if (ok) _observe(id);
     }
 
+    /// @notice Rotates a disputed escrow's arbiter — the V2 recovery lever.
+    /// @dev The harness is the proxy's owner, so this runs with the real
+    ///      governance authority rather than being blocked by access control.
+    ///      That is deliberate and matches `resolveDispute` above: the call worth
+    ///      fuzzing is the one that could conceivably misroute funds, not the one
+    ///      that reverts on the way in.
+    ///
+    ///      `setArbiter` is what PF-S133 found unreachable. With it reachable,
+    ///      `echidna_arbiter_never_credited` gets materially stronger for free —
+    ///      the arbiter is no longer a fixed address chosen at creation, so the
+    ///      fuzzer can now try to make a rotated arbiter the beneficiary.
+    /// @param seed Chooses the escrow.
+    /// @param actorSeed Chooses the replacement arbiter from the pool.
+    function rotateArbiter(uint256 seed, uint256 actorSeed) public {
+        (bool exists, uint256 id) = _pick(seed);
+        if (!exists) return;
+
+        (bool known, address b, address s, address arbBefore) = _partiesOf(id);
+        if (!known) return;
+
+        address newArbiter = address(poolActorAt(actorSeed % POOL_SIZE));
+
+        // Read the state IMMEDIATELY before the call, so what the observation is
+        // judged against is what the call executes against.
+        EscrowUpgradeable.State stateBefore = escrow.getState(id);
+
+        // Every on-chain precondition satisfied, checked against the same state
+        // the call below executes against: this rotation HAS to go through.
+        if (
+            stateBefore == EscrowUpgradeable.State.Disputed && newArbiter != address(0) && newArbiter != b
+                && newArbiter != s
+        ) {
+            ghost_rotationOpportunities += 1;
+        }
+
+        try escrow.setArbiter(id, newArbiter) {
+            ghost_rotations += 1;
+            // A rotation SUCCEEDED. V2 claims three things about that, and each
+            // one is checked here rather than assumed.
+            if (stateBefore != EscrowUpgradeable.State.Disputed) rotationBrokeItsGuards = true;
+            if (newArbiter == b || newArbiter == s) rotationBrokeItsGuards = true;
+            if (newArbiter == address(0)) rotationBrokeItsGuards = true;
+
+            // And it must have touched the arbiter field and nothing else that
+            // identifies the escrow's parties.
+            (, address bAfter, address sAfter, address arbAfter) = _partiesOf(id);
+            if (bAfter != b || sAfter != s) rotationBrokeItsGuards = true;
+            if (arbAfter != newArbiter) rotationBrokeItsGuards = true;
+            if (escrow.getState(id) != stateBefore) rotationBrokeItsGuards = true;
+
+            arbBefore; // the old arbiter is not required to differ from the new
+            _observe(id);
+        } catch {
+            // A rejected rotation must have changed nothing at all.
+            (, address bAfter, address sAfter, address arbAfter) = _partiesOf(id);
+            if (bAfter != b || sAfter != s || arbAfter != arbBefore) rotationBrokeItsGuards = true;
+            if (escrow.getState(id) != stateBefore) rotationBrokeItsGuards = true;
+        }
+    }
+
     /// @notice Submits further evidence from that escrow's buyer or seller.
     function submitEvidence(uint256 seed, bool asSeller) public {
         (bool exists, uint256 id) = _pick(seed);
@@ -500,13 +610,12 @@ contract Properties is PigfoxProperties {
 
     /// @inheritdoc PigfoxProperties
     function pigfoxPropertyCount() public pure override returns (uint256) {
-        return 6;
+        return 7;
     }
 
     /// @inheritdoc PigfoxProperties
     function pigfoxHarnessDescription() public pure override returns (string memory) {
-        return
-            "escrowed ETH always equals what is owed, an arbiter never profits, and a nullifier spends once";
+        return "escrowed ETH always equals what is owed, an arbiter never profits, a nullifier spends once, and an arbiter rotation stays inside its guards";
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -578,6 +687,15 @@ contract Properties is PigfoxProperties {
     ///      red test the moment it reappears.
     function echidna_ledger_consistent() public view returns (bool) {
         return !ledgerInconsistent;
+    }
+
+    /// @notice The V2 recovery lever never exceeded its own guards: a rotation
+    ///         only ever succeeded on a `Disputed` escrow, never installed the
+    ///         buyer, the seller or the zero address as arbiter, changed nothing
+    ///         but the arbiter field — and a rejected rotation changed nothing
+    ///         at all.
+    function echidna_rotation_respects_its_guards() public view returns (bool) {
+        return !rotationBrokeItsGuards;
     }
 
     /*//////////////////////////////////////////////////////////////
