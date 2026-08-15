@@ -1,0 +1,5 @@
+EXCEPTION
+
+The MIT grant in LICENSE does not extend to src/Verifier.sol, which snarkjs
+emits under GPL-3.0. That file is governed by GPL-3.0 and not by the terms in
+LICENSE.

@@ -882,7 +882,8 @@ docs/slither-exclusions.md  every suppressed detector, with rationale
 
 ## Licence
 
-MIT, except `src/Verifier.sol`, which snarkjs emits under GPL-3.0.
+MIT, except `src/Verifier.sol`, which snarkjs emits under GPL-3.0. See
+[LICENSE](LICENSE) for the grant and [NOTICE](NOTICE) for the exception.
 
 ## v1 deployment (retired 2026-07-26)
 
